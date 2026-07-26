@@ -1,0 +1,31 @@
+# Local development backing services: Postgres + Redis only (the API and web
+# run from source via `pnpm dev`). Ports and credentials come from the
+# repo-root .env (see .env.example).
+#
+#   docker compose -f docker/compose.dev.yml up -d
+name: shortlink-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${SHORTLINK_POSTGRES_USER:-shortlink}
+      POSTGRES_PASSWORD: ${SHORTLINK_POSTGRES_PASSWORD:-shortlink_dev_password}
+      POSTGRES_DB: ${SHORTLINK_POSTGRES_DB:-kun_shortlink}
+    ports:
+      - '127.0.0.1:${SHORTLINK_POSTGRES_PORT:-7846}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:${SHORTLINK_REDIS_PORT:-7847}:6379'
+    volumes:
+      - redis-data:/data
+
+volumes:
+  postgres-data:
+  redis-data:

@@ -1,0 +1,1078 @@
+components:
+  schemas:
+    AuthLoginOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/AuthLoginOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        authorization_endpoint:
+          description: OP authorization endpoint (from discovery)
+          type: string
+        client_id:
+          type: string
+        redirect_uri:
+          type: string
+        scope:
+          description: space-delimited scopes to request
+          type: string
+      required:
+        - authorization_endpoint
+        - client_id
+        - redirect_uri
+        - scope
+      type: object
+    BucketDTO:
+      additionalProperties: false
+      properties:
+        bucket_start:
+          format: date-time
+          type: string
+        unique_ips:
+          format: int64
+          type: integer
+        visits:
+          format: int64
+          type: integer
+      required:
+        - bucket_start
+        - visits
+        - unique_ips
+      type: object
+    CreateKeyInputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/CreateKeyInputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        name:
+          description: Which product this key belongs to, e.g. "kungal"
+          maxLength: 100
+          minLength: 1
+          type: string
+      required:
+        - name
+      type: object
+    CreateKeyOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/CreateKeyOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        key:
+          $ref: "#/components/schemas/KeyDTO"
+        plaintext:
+          description: The full API key. Shown exactly once — store it now.
+          type: string
+      required:
+        - key
+        - plaintext
+      type: object
+    CreateLinkBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/CreateLinkBody.json
+          format: uri
+          readOnly: true
+          type: string
+        alias:
+          description: Custom alias (4-32 chars of [A-Za-z0-9_-]); empty = random
+          type: string
+        description:
+          maxLength: 500
+          type: string
+        destination_url:
+          description: Absolute http(s) URL to redirect to
+          type: string
+        expires_at:
+          description: RFC3339; null/absent = never expires
+          format: date-time
+          type: string
+        forward_params:
+          description: Append the incoming query string to the destination
+          type: boolean
+        max_visits:
+          description: 0 = unlimited
+          format: int64
+          minimum: 0
+          type: integer
+      required:
+        - destination_url
+      type: object
+    CreateSessionInputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/CreateSessionInputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        code:
+          description: authorization code from the OP redirect
+          type: string
+        code_verifier:
+          description: PKCE verifier matching the sent challenge
+          type: string
+      required:
+        - code
+        - code_verifier
+      type: object
+    CreateSessionOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/CreateSessionOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        is_admin:
+          type: boolean
+        name:
+          type: string
+        roles:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        user_id:
+          format: int64
+          type: integer
+      required:
+        - user_id
+        - name
+        - roles
+        - is_admin
+      type: object
+    ErrorDetail:
+      additionalProperties: false
+      properties:
+        location:
+          description: Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id'
+          type: string
+        message:
+          description: Error message text
+          type: string
+        value:
+          description: The value at the given location
+      type: object
+    ErrorModel:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ErrorModel.json
+          format: uri
+          readOnly: true
+          type: string
+        detail:
+          description: A human-readable explanation specific to this occurrence of the problem.
+          examples:
+            - Property foo is required but is missing.
+          type: string
+        errors:
+          description: Optional list of individual error details
+          items:
+            $ref: "#/components/schemas/ErrorDetail"
+          type:
+            - array
+            - "null"
+        instance:
+          description: A URI reference that identifies the specific occurrence of the problem.
+          examples:
+            - https://example.com/error-log/abc123
+          format: uri
+          type: string
+        status:
+          description: HTTP status code
+          examples:
+            - 400
+          format: int64
+          type: integer
+        title:
+          description: A short, human-readable summary of the problem type. This value should not change between occurrences of the error.
+          examples:
+            - Bad Request
+          type: string
+        type:
+          default: about:blank
+          description: A URI reference to human-readable documentation for the error.
+          examples:
+            - https://example.com/errors/example
+          format: uri
+          type: string
+      type: object
+    HealthOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/HealthOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        status:
+          description: Liveness status
+          examples:
+            - ok
+          type: string
+        version:
+          description: Build version
+          examples:
+            - dev
+          type: string
+      required:
+        - status
+        - version
+      type: object
+    KeyDTO:
+      additionalProperties: false
+      properties:
+        created_at:
+          format: date-time
+          type: string
+        created_by:
+          format: int64
+          type: integer
+        disabled:
+          type: boolean
+        id:
+          format: int64
+          type: integer
+        key_prefix:
+          description: First characters of the plaintext, for display
+          type: string
+        last_used_at:
+          format: date-time
+          type:
+            - string
+            - "null"
+        name:
+          type: string
+      required:
+        - id
+        - name
+        - key_prefix
+        - disabled
+        - last_used_at
+        - created_by
+        - created_at
+      type: object
+    KeyListOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/KeyListOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        keys:
+          items:
+            $ref: "#/components/schemas/KeyDTO"
+          type:
+            - array
+            - "null"
+      required:
+        - keys
+      type: object
+    LinkDTO:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/LinkDTO.json
+          format: uri
+          readOnly: true
+          type: string
+        alias:
+          type: string
+        created_at:
+          format: date-time
+          type: string
+        created_by:
+          description: IdP user id; 0 for S2S-created links
+          format: int64
+          type: integer
+        created_via:
+          description: "\"dashboard\" or the S2S API key name"
+          type: string
+        description:
+          type: string
+        destination_url:
+          type: string
+        expires_at:
+          format: date-time
+          type:
+            - string
+            - "null"
+        forward_params:
+          type: boolean
+        id:
+          format: int64
+          type: integer
+        last_visited_at:
+          format: date-time
+          type:
+            - string
+            - "null"
+        max_visits:
+          description: 0 = unlimited
+          format: int64
+          type: integer
+        short_url:
+          description: Advertised short URL (public base + /s/alias)
+          type: string
+        status:
+          description: 0=active 1=disabled 2=archived
+          format: int32
+          type: integer
+        visit_count:
+          format: int64
+          type: integer
+      required:
+        - id
+        - alias
+        - short_url
+        - destination_url
+        - description
+        - status
+        - expires_at
+        - max_visits
+        - visit_count
+        - last_visited_at
+        - forward_params
+        - created_by
+        - created_via
+        - created_at
+      type: object
+    LinkListOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/LinkListOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        links:
+          items:
+            $ref: "#/components/schemas/LinkDTO"
+          type:
+            - array
+            - "null"
+      required:
+        - links
+      type: object
+    LinkStatsOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/LinkStatsOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        buckets:
+          items:
+            $ref: "#/components/schemas/BucketDTO"
+          type:
+            - array
+            - "null"
+        link:
+          $ref: "#/components/schemas/LinkDTO"
+        range_days:
+          format: int64
+          type: integer
+        recent:
+          items:
+            $ref: "#/components/schemas/VisitDTO"
+          type:
+            - array
+            - "null"
+        unique_visitors:
+          description: all-time distinct IPs
+          format: int64
+          type: integer
+      required:
+        - link
+        - range_days
+        - unique_visitors
+        - buckets
+        - recent
+      type: object
+    MeOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/MeOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        is_admin:
+          type: boolean
+        name:
+          type: string
+        roles:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        user_id:
+          format: int64
+          type: integer
+      required:
+        - user_id
+        - name
+        - roles
+        - is_admin
+      type: object
+    OkOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/OkOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        ok:
+          type: boolean
+      required:
+        - ok
+      type: object
+    S2sCreateLinkInputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/S2sCreateLinkInputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        alias:
+          description: Custom alias (4-32 chars of [A-Za-z0-9_-]); empty = random
+          type: string
+        description:
+          maxLength: 500
+          type: string
+        destination_url:
+          description: Absolute http(s) URL to redirect to
+          type: string
+        expires_at:
+          description: RFC3339; null/absent = never expires
+          format: date-time
+          type: string
+        forward_params:
+          description: Append the incoming query string to the destination
+          type: boolean
+        max_visits:
+          description: 0 = unlimited
+          format: int64
+          minimum: 0
+          type: integer
+        reuse:
+          description: Default true. False forces a new link even when an equivalent exists.
+          type: boolean
+      required:
+        - destination_url
+      type: object
+    S2sLinkOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/S2sLinkOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        alias:
+          type: string
+        created_at:
+          format: date-time
+          type: string
+        created_by:
+          description: IdP user id; 0 for S2S-created links
+          format: int64
+          type: integer
+        created_via:
+          description: "\"dashboard\" or the S2S API key name"
+          type: string
+        description:
+          type: string
+        destination_url:
+          type: string
+        expires_at:
+          format: date-time
+          type:
+            - string
+            - "null"
+        forward_params:
+          type: boolean
+        id:
+          format: int64
+          type: integer
+        last_visited_at:
+          format: date-time
+          type:
+            - string
+            - "null"
+        max_visits:
+          description: 0 = unlimited
+          format: int64
+          type: integer
+        reused:
+          description: True when an existing equivalent link was returned instead of a new one
+          type: boolean
+        short_url:
+          description: Advertised short URL (public base + /s/alias)
+          type: string
+        status:
+          description: 0=active 1=disabled 2=archived
+          format: int32
+          type: integer
+        visit_count:
+          format: int64
+          type: integer
+      required:
+        - reused
+        - id
+        - alias
+        - short_url
+        - destination_url
+        - description
+        - status
+        - expires_at
+        - max_visits
+        - visit_count
+        - last_visited_at
+        - forward_params
+        - created_by
+        - created_via
+        - created_at
+      type: object
+    SetKeyDisabledInputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/SetKeyDisabledInputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        disabled:
+          type: boolean
+      required:
+        - disabled
+      type: object
+    UpdateLinkInputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/UpdateLinkInputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        description:
+          maxLength: 500
+          type: string
+        destination_url:
+          type: string
+        expires_at:
+          description: null clears the expiry
+          format: date-time
+          type:
+            - string
+            - "null"
+        forward_params:
+          type: boolean
+        max_visits:
+          format: int64
+          minimum: 0
+          type: integer
+        status:
+          description: 0=active 1=disabled 2=archived
+          format: int32
+          maximum: 2
+          minimum: 0
+          type: integer
+      required:
+        - destination_url
+        - description
+        - status
+        - expires_at
+        - max_visits
+        - forward_params
+      type: object
+    VisitDTO:
+      additionalProperties: false
+      properties:
+        created_at:
+          format: date-time
+          type: string
+        id:
+          format: int64
+          type: integer
+        ip:
+          type: string
+        is_unique:
+          type: boolean
+        referer:
+          type: string
+        user_agent:
+          type: string
+      required:
+        - id
+        - ip
+        - user_agent
+        - referer
+        - is_unique
+        - created_at
+      type: object
+info:
+  title: KunGal Link Shortener API
+  version: 1.0.0
+openapi: 3.1.0
+paths:
+  /auth/login:
+    get:
+      description: Returns the discovered authorization endpoint and public client parameters the browser needs to start the PKCE authorization-code flow. Contains no secrets.
+      operationId: auth-login
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthLoginOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Begin OIDC login
+      tags:
+        - auth
+  /auth/me:
+    get:
+      description: Returns the authenticated identity resolved from the session cookie, or 401 when anonymous.
+      operationId: get-me
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Current identity
+      tags:
+        - auth
+  /auth/session:
+    delete:
+      description: Deletes the server-side session and clears the session cookie. Idempotent.
+      operationId: delete-session
+      parameters:
+        - in: cookie
+          name: shortlink_session
+          schema:
+            type: string
+      responses:
+        "204":
+          description: No Content
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Log out
+      tags:
+        - auth
+    post:
+      description: Exchanges {code, code_verifier} at the OP token endpoint, verifies the access token, stores the tokens in a server-side session, and sets the httpOnly session cookie. The browser never receives tokens.
+      operationId: create-session
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionInputBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateSessionOutputBody"
+          description: OK
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Exchange an authorization code for a session
+      tags:
+        - auth
+  /healthz:
+    get:
+      description: Reports that the process is up. Does not touch the database.
+      operationId: healthz
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Liveness probe
+      tags:
+        - system
+  /keys:
+    get:
+      operationId: list-keys
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KeyListOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List S2S API keys
+      tags:
+        - keys
+    post:
+      operationId: create-key
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateKeyInputBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateKeyOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Mint an S2S API key (plaintext shown exactly once)
+      tags:
+        - keys
+  /keys/{id}:
+    delete:
+      operationId: delete-key
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: int64
+            type: integer
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Delete an S2S API key permanently
+      tags:
+        - keys
+  /keys/{id}/disabled:
+    put:
+      operationId: set-key-disabled
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: int64
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetKeyDisabledInputBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Disable or re-enable an S2S API key
+      tags:
+        - keys
+  /links:
+    get:
+      operationId: list-links
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LinkListOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List short links (newest first)
+      tags:
+        - links
+    post:
+      operationId: create-link
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLinkBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LinkDTO"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Create a short link
+      tags:
+        - links
+  /links/{alias}/stats:
+    get:
+      operationId: link-stats
+      parameters:
+        - in: path
+          name: alias
+          required: true
+          schema:
+            type: string
+        - description: days of buckets to return (1-30, default 7)
+          explode: false
+          in: query
+          name: range
+          schema:
+            description: days of buckets to return (1-30, default 7)
+            format: int64
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LinkStatsOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Visit stats for one link (hourly buckets + recent visits)
+      tags:
+        - links
+  /links/{id}:
+    delete:
+      operationId: delete-link
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: int64
+            type: integer
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Delete a short link (visits and buckets cascade)
+      tags:
+        - links
+    put:
+      operationId: update-link
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: int64
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLinkInputBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LinkDTO"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Update a short link (full editable field set)
+      tags:
+        - links
+  /s2s/links:
+    post:
+      description: Authenticated by a Bearer API key minted in the dashboard. When alias is empty and reuse is not disabled, an existing active plain link for the same destination is returned instead of minting a duplicate.
+      operationId: s2s-create-link
+      parameters:
+        - description: Bearer slk_...
+          in: header
+          name: Authorization
+          schema:
+            description: Bearer slk_...
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/S2sCreateLinkInputBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/S2sLinkOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - apiKey: []
+      summary: Create (or reuse) a short link
+      tags:
+        - s2s
+  /s2s/links/{alias}:
+    get:
+      operationId: s2s-get-link
+      parameters:
+        - description: Bearer slk_...
+          in: header
+          name: Authorization
+          schema:
+            description: Bearer slk_...
+            type: string
+        - in: path
+          name: alias
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LinkDTO"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - apiKey: []
+      summary: Look up a short link by alias
+      tags:
+        - s2s

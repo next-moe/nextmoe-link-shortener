@@ -1,0 +1,11 @@
+{
+  "name": "@shortlink/api",
+  "private": true,
+  "scripts": {
+    "dev": "go run ./cmd/server",
+    "build": "go build -o ./build/server ./cmd/server",
+    "test": "go test ./...",
+    "lint": "go vet ./...",
+    "gen": "go run ./cmd/spec > openapi/openapi.yaml"
+  }
+}

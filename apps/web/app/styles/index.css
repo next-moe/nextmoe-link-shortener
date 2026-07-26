@@ -1,0 +1,44 @@
+/*
+ * Tailwind entry — this app owns it. The @kungal/ui-nuxt layer ships no
+ * Tailwind entry, so the required imports live here (order matters):
+ *   1. tailwindcss        — first; KunUI never imports it for you.
+ *   2. @kungal/ui-tokens  — semantic color / radius / z-index tokens + the
+ *                           .kun-dark-mode variant + base layer.
+ *   3. @kungal/ui-vue/style.css — components' scoped styles.
+ * The default KunUI theme is used as-is; no palette overrides, no gradients
+ * (iron rule 2).
+ */
+@import 'tailwindcss';
+@import '@kungal/ui-tokens';
+@import '@kungal/ui-vue/style.css';
+
+/*
+ * Tailwind v4 ignores node_modules, so point it at the compiled KunUI
+ * packages to generate the utility classes the components use. Paths are
+ * relative to THIS file (apps/web/app/styles/index.css → ../../node_modules).
+ */
+@source '../../node_modules/@kungal/ui-vue';
+@source '../../node_modules/@kungal/ui-core';
+
+@layer base {
+  html,
+  body {
+    /* Solid background — KunUI's dark variant only swaps CSS vars, so the
+       root needs an explicit fill. */
+    background-color: oklch(var(--background));
+    color: oklch(var(--foreground));
+    min-height: 100vh;
+  }
+
+  /* Reserve the scrollbar gutter so the document width is constant across
+     routes; no-op under overlay scrollbars. */
+  html {
+    scrollbar-gutter: stable;
+  }
+}
+
+@supports not (scrollbar-gutter: stable) {
+  html {
+    overflow-y: scroll;
+  }
+}
