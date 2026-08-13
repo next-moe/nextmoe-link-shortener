@@ -2,10 +2,9 @@
 
 ## 铁律 (Iron Rules — non-negotiable)
 
-1. **Commit, but do not push.** Commit changes whenever appropriate, but do not run `git push` on your own initiative — the user pushes.
-2. **No background gradients in any UI, ever.** Never use gradient backgrounds (`bg-gradient-*`, `linear-gradient()`, etc.); use solid colors from the KunUI palette.
-3. **Prefer KunUI components; do not modify KunUI itself.** Reach for a `<Kun*>` component (`@kungal/ui-*`) first — do not hand-roll a custom component unless there is genuinely no KunUI equivalent. If KunUI appears to have a bug or a missing feature, report it to the user instead of patching around it.
-4. **Zero secrets in the repo.** `.env.example` carries placeholder values only; real credentials live in the git-ignored `.env`.
+1. **No background gradients in any UI, ever.** Never use gradient backgrounds (`bg-gradient-*`, `linear-gradient()`, etc.); use solid colors from the KunUI palette.
+2. **Prefer KunUI components; do not modify KunUI itself.** Reach for a `<Kun*>` component (`@kungal/ui-*`) first — do not hand-roll a custom component unless there is genuinely no KunUI equivalent. If KunUI appears to have a bug or a missing feature, report it to the user instead of patching around it.
+3. **Zero secrets in the repo.** `.env.example` carries placeholder values only; real credentials live in the git-ignored `.env`.
 
 ## What this is
 
