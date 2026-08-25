@@ -41,7 +41,8 @@ apps/web   Nuxt 4 · @kungal/ui-nuxt layer · Tailwind v4 · same-origin /api pr
 - `pnpm dev` — copy `.env` from `.env.example` if missing, start backing
   services (`docker/compose.dev.yml`: Postgres :7846, Redis :7847), then run
   API (:7845) + web (:7844) together. `pnpm dev:services` starts only Postgres
-  and Redis.
+  and Redis. `pnpm oidc:register` upserts the public local OAuth client
+  (`shortlink-dev`) into infra's `kun_galgame_infra.oauth_clients`.
 - `pnpm verify` — lint + test + regenerate OpenAPI spec & TS types + fail on
   drift. Run before committing API-surface changes.
 - `pnpm gen` — regenerate `apps/api/openapi/openapi.yaml` (from code) and

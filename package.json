@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "bash scripts/dev.sh",
     "dev:services": "bash scripts/dev.sh --services-only",
+    "oidc:register": "bash scripts/register-dev-oidc-client.sh",
     "dev:web": "pnpm -F @shortlink/web run dev",
     "dev:api": "pnpm -F @shortlink/api run dev",
     "build": "pnpm -F @shortlink/api run build && pnpm -F @shortlink/web run build",

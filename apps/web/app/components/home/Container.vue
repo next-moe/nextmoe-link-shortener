@@ -28,7 +28,13 @@ const handleLogin = async () => {
 <template>
   <main class="flex min-h-[80vh] items-center justify-center px-6">
     <KunCard class="flex w-full max-w-md flex-col items-center gap-6 p-10 text-center">
-      <KunIcon name="lucide:link" class="text-primary text-5xl" />
+      <img
+        src="/apple-touch-icon.png"
+        alt=""
+        width="80"
+        height="80"
+        class="size-20 rounded-2xl"
+      />
       <div class="flex flex-col gap-2">
         <h1 class="text-xl font-semibold">KunGal Link Shortener</h1>
         <p class="text-sm text-default-500">

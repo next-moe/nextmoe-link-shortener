@@ -18,7 +18,13 @@ const handleLogout = async () => {
   <header class="border-b border-default-200">
     <nav class="mx-auto flex h-14 max-w-5xl items-center gap-4 px-4">
       <NuxtLink to="/" class="flex items-center gap-2 font-semibold">
-        <KunIcon name="lucide:link" class="text-primary" />
+        <img
+          src="/apple-touch-icon.png"
+          alt=""
+          width="28"
+          height="28"
+          class="size-7 rounded-lg"
+        />
         <span>KunGal Link Shortener</span>
       </NuxtLink>
 

@@ -32,9 +32,16 @@ pnpm dev                      # 缺 .env 时从 .env.example 复制；拉起 Pos
 pnpm dev:services             # docker compose --env-file .env -f docker/compose.dev.yml up -d --wait
 ```
 
-无本地 IdP 时（dev 模式），API 接受 `Authorization: Dev <user_id> [roles]`
-后门（如 `Dev 1 admin`），控制台登录不可用但 API 可直接调试。需要完整 OIDC
-登录时，把 `SHORTLINK_OIDC_*` 填进 `.env` 后重启 API。
+本地登录走 NextMoe IdP（infra oauth `:9277`）。先确保 infra 的 `pnpm dev` 在跑，
+再注册本站的 dev OAuth client（幂等）：
+
+```bash
+pnpm oidc:register            # 写入 kun_galgame_infra.oauth_clients
+```
+
+`.env.example` 已带公开的本地凭证（`shortlink-dev` / `dev-secret-shortlink-dev`）。
+无 IdP 时把 `SHORTLINK_OIDC_ISSUER` / `CLIENT_ID` / `CLIENT_SECRET` 留空，API
+接受 `Authorization: Dev <user_id> [roles]` 后门（如 `Dev 1 admin`）。
 
 ## S2S API（生态站点接入）
 
