@@ -45,6 +45,20 @@ Authorization: Bearer slk_...
 - 相同 `destination_url` 的活跃随机短链默认复用（`reuse=false` 关闭）
 - `GET /s2s/links/{alias}` 查询单条短链
 
+批量拉取按日统计（结算粒度）：
+
+```
+POST /s2s/stats/daily
+Authorization: Bearer slk_...
+{ "aliases": ["aB3kZ9"], "from": "2026-09-01", "to": "2026-09-30" }
+→ { "stats": { "aB3kZ9": [ { "date": "2026-09-01", "total": 12, "uniques": 9 } ] } }
+```
+
+- `from` / `to` 是 **JST（Asia/Tokyo）日历日**，闭区间，跨度 ≤ 92 天；无流量的日不出现
+- 去重口径：一个访问指纹 `sha256(ip + "\n" + user_agent)` 在同一短链的同一 JST 日只计一次 unique
+- `aliases` 一批 1-500 个；越界或超限 → 422
+- 未知 alias 返回空数组而不是 404 —— 单个未知不得让整批失败
+
 完整契约见 `apps/api/openapi/openapi.yaml`（code-first，`pnpm gen` 再生）。
 
 ## 部署

@@ -230,6 +230,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/s2s/stats/daily": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Batch daily visit stats for a set of aliases
+         * @description Per-alias daily totals and deduplicated visitor counts over an inclusive JST date range (at most 92 days, at most 500 aliases). Days without traffic are omitted; an alias that does not exist yields an empty array rather than failing the batch.
+         */
+        post: operations["s2s-daily-stats"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -326,6 +346,52 @@ export interface components {
             roles: string[] | null;
             /** Format: int64 */
             user_id: number;
+        };
+        DailyStatDTO: {
+            /** @description JST calendar day (YYYY-MM-DD) */
+            date: string;
+            /**
+             * Format: int64
+             * @description All hits recorded that day
+             */
+            total: number;
+            /**
+             * Format: int64
+             * @description Distinct visitor fingerprints that day
+             */
+            uniques: number;
+        };
+        DailyStatsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DailyStatsBody.json
+             */
+            readonly $schema?: string;
+            /** @description Short link aliases to report on */
+            aliases: string[] | null;
+            /**
+             * Format: date
+             * @description First JST day, inclusive (YYYY-MM-DD)
+             */
+            from: string;
+            /**
+             * Format: date
+             * @description Last JST day, inclusive (YYYY-MM-DD)
+             */
+            to: string;
+        };
+        DailyStatsResult: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DailyStatsResult.json
+             */
+            readonly $schema?: string;
+            /** @description Alias to its days with traffic, ascending; unknown aliases map to an empty array */
+            stats: {
+                [key: string]: components["schemas"]["DailyStatDTO"][] | null;
+            };
         };
         ErrorDetail: {
             /** @description Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id' */
@@ -1120,6 +1186,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LinkDTO"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "s2s-daily-stats": {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Bearer slk_... */
+                Authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DailyStatsBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyStatsResult"];
                 };
             };
             /** @description Error */

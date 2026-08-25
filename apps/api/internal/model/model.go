@@ -46,6 +46,8 @@ type ShortLinkVisit struct {
 	IP          string `gorm:"size:45;not null;default:'';index:idx_visit_link_ip"`
 	UserAgent   string `gorm:"size:500;not null;default:''"`
 	Referer     string `gorm:"size:500;not null;default:''"`
+	// FpHash is hex(sha256(ip + "\n" + user_agent)).
+	FpHash string `gorm:"size:64;not null;default:''"`
 	// IsUnique marks the first visit from this IP within the bucket window.
 	IsUnique  bool      `gorm:"not null;default:false"`
 	CreatedAt time.Time `gorm:"index:idx_visit_link_created"`
@@ -55,6 +57,37 @@ type ShortLinkVisit struct {
 
 // TableName keeps the legacy singular name.
 func (ShortLinkVisit) TableName() string { return "short_link_visit" }
+
+// ShortLinkVisitorDay records that a fingerprint was seen on a link on a JST
+// day. All three columns form the primary key: the insert either lands (first
+// sighting) or conflicts, so the day's unique count needs no read-then-write.
+type ShortLinkVisitorDay struct {
+	ShortLinkID int64     `gorm:"primaryKey"`
+	Day         time.Time `gorm:"type:date;primaryKey"`
+	FpHash      string    `gorm:"size:64;primaryKey"`
+	CreatedAt   time.Time
+
+	ShortLink ShortLink `gorm:"constraint:OnDelete:CASCADE"`
+}
+
+// TableName names the settlement-grade visitor-day table.
+func (ShortLinkVisitorDay) TableName() string { return "short_link_visitor_days" }
+
+// ShortLinkVisitDay is the per-JST-day aggregate the settlement surface reads:
+// total hits and deduplicated visitors.
+type ShortLinkVisitDay struct {
+	ShortLinkID int64     `gorm:"primaryKey"`
+	Day         time.Time `gorm:"type:date;primaryKey"`
+	Total       int64     `gorm:"not null;default:0"`
+	Uniques     int64     `gorm:"not null;default:0"`
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+
+	ShortLink ShortLink `gorm:"constraint:OnDelete:CASCADE"`
+}
+
+// TableName names the settlement-grade daily aggregate table.
+func (ShortLinkVisitDay) TableName() string { return "short_link_visit_days" }
 
 // ShortLinkVisitBucket is the hourly aggregate used by the stats charts.
 type ShortLinkVisitBucket struct {

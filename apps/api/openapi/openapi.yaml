@@ -163,6 +163,79 @@ components:
         - roles
         - is_admin
       type: object
+    DailyStatDTO:
+      additionalProperties: false
+      properties:
+        date:
+          description: JST calendar day (YYYY-MM-DD)
+          type: string
+        total:
+          description: All hits recorded that day
+          format: int64
+          type: integer
+        uniques:
+          description: Distinct visitor fingerprints that day
+          format: int64
+          type: integer
+      required:
+        - date
+        - total
+        - uniques
+      type: object
+    DailyStatsBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/DailyStatsBody.json
+          format: uri
+          readOnly: true
+          type: string
+        aliases:
+          description: Short link aliases to report on
+          items:
+            type: string
+          maxItems: 500
+          minItems: 1
+          type:
+            - array
+            - "null"
+        from:
+          description: First JST day, inclusive (YYYY-MM-DD)
+          format: date
+          type: string
+        to:
+          description: Last JST day, inclusive (YYYY-MM-DD)
+          format: date
+          type: string
+      required:
+        - aliases
+        - from
+        - to
+      type: object
+    DailyStatsResult:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/DailyStatsResult.json
+          format: uri
+          readOnly: true
+          type: string
+        stats:
+          additionalProperties:
+            items:
+              $ref: "#/components/schemas/DailyStatDTO"
+            type:
+              - array
+              - "null"
+          description: Alias to its days with traffic, ascending; unknown aliases map to an empty array
+          type: object
+      required:
+        - stats
+      type: object
     ErrorDetail:
       additionalProperties: false
       properties:
@@ -1074,5 +1147,40 @@ paths:
       security:
         - apiKey: []
       summary: Look up a short link by alias
+      tags:
+        - s2s
+  /s2s/stats/daily:
+    post:
+      description: Per-alias daily totals and deduplicated visitor counts over an inclusive JST date range (at most 92 days, at most 500 aliases). Days without traffic are omitted; an alias that does not exist yields an empty array rather than failing the batch.
+      operationId: s2s-daily-stats
+      parameters:
+        - description: Bearer slk_...
+          in: header
+          name: Authorization
+          schema:
+            description: Bearer slk_...
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DailyStatsBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyStatsResult"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - apiKey: []
+      summary: Batch daily visit stats for a set of aliases
       tags:
         - s2s
