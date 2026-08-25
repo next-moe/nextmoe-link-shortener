@@ -4,7 +4,8 @@
   "private": true,
   "packageManager": "pnpm@10.17.1",
   "scripts": {
-    "dev": "pnpm -F \"./apps/**\" --parallel --stream run dev",
+    "dev": "bash scripts/dev.sh",
+    "dev:services": "bash scripts/dev.sh --services-only",
     "dev:web": "pnpm -F @shortlink/web run dev",
     "dev:api": "pnpm -F @shortlink/api run dev",
     "build": "pnpm -F @shortlink/api run build && pnpm -F @shortlink/web run build",

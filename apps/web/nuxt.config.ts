@@ -21,9 +21,20 @@ export default defineNuxtConfig({
 
   // Strip the /api prefix and forward to the Go API; forward /s/** verbatim
   // (the API serves the redirect at /s/{alias}).
+  //
+  // redirect: 'manual' is required: ofetch/h3 follows 3xx by default, so a
+  // short-link 302 would be consumed by Nitro and the destination HTML
+  // streamed back as 200. The browser must see the Location itself.
   routeRules: {
-    '/api/**': { proxy: `${apiProxyTarget}/**` },
-    '/s/**': { proxy: `${apiProxyTarget}/s/**` }
+    '/api/**': {
+      proxy: { to: `${apiProxyTarget}/**`, fetchOptions: { redirect: 'manual' } }
+    },
+    '/s/**': {
+      proxy: {
+        to: `${apiProxyTarget}/s/**`,
+        fetchOptions: { redirect: 'manual' }
+      }
+    }
   },
 
   // apiBase is where SSR data fetches would hit the Go API directly. The

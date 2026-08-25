@@ -66,7 +66,7 @@ func Load() (Config, error) {
 		RedisAddr: os.Getenv("SHORTLINK_REDIS_ADDR"),
 	}
 	if cfg.DBDSN == "" {
-		return Config{}, fmt.Errorf("SHORTLINK_DB_DSN is required")
+		return Config{}, fmt.Errorf("SHORTLINK_DB_DSN is required (copy .env.example to the repo-root .env; `pnpm dev` starts local Postgres)")
 	}
 	if len(cfg.AdminRoles) == 0 {
 		return Config{}, fmt.Errorf("SHORTLINK_ADMIN_ROLES must not be empty")

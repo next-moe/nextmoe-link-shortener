@@ -21,14 +21,20 @@ letmoe …）通过 S2S API 生成短链；管理员通过生态 OIDC 登录控�
 ## 本地开发
 
 ```bash
-cp .env.example .env          # 按需修改；无 IdP 时 dev 模式有 Dev header 后门
-docker compose -f docker/compose.dev.yml up -d   # Postgres :7846 + Redis :7847
 pnpm install
-pnpm dev                      # api :7845 + web :7844
+pnpm dev                      # 缺 .env 时从 .env.example 复制；拉起 Postgres :7846
+                              # + Redis :7847；然后 api :7845 + web :7844
+```
+
+`pnpm dev` 会自己起 backing services。若只想起数据库：
+
+```bash
+pnpm dev:services             # docker compose --env-file .env -f docker/compose.dev.yml up -d --wait
 ```
 
 无本地 IdP 时（dev 模式），API 接受 `Authorization: Dev <user_id> [roles]`
-后门（如 `Dev 1 admin`），控制台登录不可用但 API 可直接调试。
+后门（如 `Dev 1 admin`），控制台登录不可用但 API 可直接调试。需要完整 OIDC
+登录时，把 `SHORTLINK_OIDC_*` 填进 `.env` 后重启 API。
 
 ## S2S API（生态站点接入）
 
