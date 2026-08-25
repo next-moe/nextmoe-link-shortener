@@ -10,7 +10,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/kungal/kungal-link-shortener/apps/api/internal/engine"
+	"github.com/next-moe/nextmoe-link-shortener/apps/api/internal/engine"
 )
 
 // registerLinks wires the dashboard link CRUD + stats. Every handler is

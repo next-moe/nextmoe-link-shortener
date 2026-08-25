@@ -22,7 +22,7 @@ INSERT INTO oauth_clients
    dev_enabled, dev_tier, dev_nsfw_allowed, dev_rate_per_min, dev_quota_daily,
    dev_review_status)
 VALUES
-  ('${client_id}', 'KunGal Link Shortener (dev)', 'sha256:${hash}',
+  ('${client_id}', 'NextMoe Link Shortener (dev)', 'sha256:${hash}',
    '["http://127.0.0.1:7844/auth/callback"]',
    '["authorization_code","refresh_token"]',
    false, true, 7776000, '["openid","profile","email"]',
@@ -30,6 +30,7 @@ VALUES
    false, '', false, 0, 0,
    'approved')
 ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name,
   secret = EXCLUDED.secret,
   redirect_uris = EXCLUDED.redirect_uris,
   grants = EXCLUDED.grants,

@@ -6,7 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/kungal/kungal-link-shortener/apps/api/internal/model"
+	"github.com/next-moe/nextmoe-link-shortener/apps/api/internal/model"
 )
 
 // CreateLinkParams are the inputs for CreateLink. An empty Alias asks for a

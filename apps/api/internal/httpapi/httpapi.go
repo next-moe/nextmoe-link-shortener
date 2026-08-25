@@ -14,9 +14,9 @@ import (
 	"github.com/danielgtaylor/huma/v2/adapters/humafiber"
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/kungal/kungal-link-shortener/apps/api/internal/auth"
-	"github.com/kungal/kungal-link-shortener/apps/api/internal/engine"
-	"github.com/kungal/kungal-link-shortener/apps/api/internal/model"
+	"github.com/next-moe/nextmoe-link-shortener/apps/api/internal/auth"
+	"github.com/next-moe/nextmoe-link-shortener/apps/api/internal/engine"
+	"github.com/next-moe/nextmoe-link-shortener/apps/api/internal/model"
 )
 
 // Version is the build version, overridable at build time via -ldflags.
@@ -46,7 +46,7 @@ type handlers struct {
 // middleware, and registers every operation. It returns the huma.API so
 // callers (cmd/spec) can export the OpenAPI document.
 func NewAPI(app *fiber.App, deps Deps) huma.API {
-	cfg := huma.DefaultConfig("KunGal Link Shortener API", "1.0.0")
+	cfg := huma.DefaultConfig("NextMoe Link Shortener API", "1.0.0")
 	api := humafiber.New(app, cfg)
 
 	resolver := deps.Resolver

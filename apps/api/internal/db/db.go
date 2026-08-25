@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
-	"github.com/kungal/kungal-link-shortener/apps/api/internal/model"
+	"github.com/next-moe/nextmoe-link-shortener/apps/api/internal/model"
 )
 
 // DB wraps the GORM handle.

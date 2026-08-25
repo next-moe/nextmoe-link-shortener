@@ -9,8 +9,8 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/kungal/kungal-link-shortener/apps/api/internal/engine"
-	"github.com/kungal/kungal-link-shortener/apps/api/internal/model"
+	"github.com/next-moe/nextmoe-link-shortener/apps/api/internal/engine"
+	"github.com/next-moe/nextmoe-link-shortener/apps/api/internal/model"
 )
 
 // registerS2S wires the sibling-product surface: create/resolve short links

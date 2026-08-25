@@ -16,11 +16,11 @@
 #
 # Images are pushed by .github/workflows/build.yml; pin :sha tags in the
 # panel for reproducible rollbacks (infra convention).
-name: kungal-link-shortener
+name: nextmoe-link-shortener
 
 services:
   api:
-    image: ghcr.io/kungal/shortlink-api:latest
+    image: ghcr.io/next-moe/shortlink-api:latest
     restart: unless-stopped
     environment:
       SHORTLINK_MODE: prod
@@ -41,13 +41,10 @@ services:
       - redis
 
   web:
-    image: ghcr.io/kungal/shortlink-web:latest
-    restart: unless-stopped
-  web:
     # The /api and /s proxy target (http://api:7845) is baked into this image
     # at build time (docker/web.Dockerfile ARG API_PROXY_TARGET) — keep the
     # api service name stable.
-    image: ghcr.io/kungal/shortlink-web:latest
+    image: ghcr.io/next-moe/shortlink-web:latest
     restart: unless-stopped
     ports:
       - '3000'

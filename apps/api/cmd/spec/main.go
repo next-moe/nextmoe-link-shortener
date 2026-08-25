@@ -9,7 +9,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/kungal/kungal-link-shortener/apps/api/internal/httpapi"
+	"github.com/next-moe/nextmoe-link-shortener/apps/api/internal/httpapi"
 )
 
 func main() {

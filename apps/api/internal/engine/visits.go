@@ -8,7 +8,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"github.com/kungal/kungal-link-shortener/apps/api/internal/model"
+	"github.com/next-moe/nextmoe-link-shortener/apps/api/internal/model"
 )
 
 // bucketSize is the visit-aggregation window (hourly buckets; also the

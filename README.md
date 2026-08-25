@@ -1,4 +1,4 @@
-# kungal-link-shortener
+# nextmoe-link-shortener
 
 NextMoe 生态的共享短链接服务：Go API + Nuxt 控制台。生态站点（kungal / moyu /
 letmoe …）通过 S2S API 生成短链；管理员通过生态 OIDC 登录控制台管理短链。
@@ -64,8 +64,8 @@ Authorization: Bearer slk_...
 
 CI（`.github/workflows/build.yml`）按路径过滤构建镜像推 GHCR：
 
-- `ghcr.io/kungal/shortlink-api`（distroless，`/s` 跳转 + API）
-- `ghcr.io/kungal/shortlink-web`（Nitro node-server）
+- `ghcr.io/next-moe/shortlink-api`（distroless，`/s` 跳转 + API）
+- `ghcr.io/next-moe/shortlink-web`（Nitro node-server）
 
 Dokploy 参照 `docker/compose.dokploy.yml`：web 容器对外，`/api/**` 与 `/s/**`
 由 Nitro 代理到 api 容器；Postgres 用宿主机实例，Redis 随 compose。

@@ -25,7 +25,7 @@ const handleLogout = async () => {
           height="28"
           class="size-7 rounded-lg"
         />
-        <span>KunGal Link Shortener</span>
+        <span>NextMoe Link Shortener</span>
       </NuxtLink>
 
       <div class="grow" />

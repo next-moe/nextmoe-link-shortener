@@ -15,11 +15,11 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/redis/go-redis/v9"
 
-	"github.com/kungal/kungal-link-shortener/apps/api/internal/auth"
-	"github.com/kungal/kungal-link-shortener/apps/api/internal/config"
-	"github.com/kungal/kungal-link-shortener/apps/api/internal/db"
-	"github.com/kungal/kungal-link-shortener/apps/api/internal/engine"
-	"github.com/kungal/kungal-link-shortener/apps/api/internal/httpapi"
+	"github.com/next-moe/nextmoe-link-shortener/apps/api/internal/auth"
+	"github.com/next-moe/nextmoe-link-shortener/apps/api/internal/config"
+	"github.com/next-moe/nextmoe-link-shortener/apps/api/internal/db"
+	"github.com/next-moe/nextmoe-link-shortener/apps/api/internal/engine"
+	"github.com/next-moe/nextmoe-link-shortener/apps/api/internal/httpapi"
 )
 
 func main() {

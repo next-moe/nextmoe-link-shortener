@@ -36,7 +36,7 @@ const handleLogin = async () => {
         class="size-20 rounded-2xl"
       />
       <div class="flex flex-col gap-2">
-        <h1 class="text-xl font-semibold">KunGal Link Shortener</h1>
+        <h1 class="text-xl font-semibold">NextMoe Link Shortener</h1>
         <p class="text-sm text-default-500">
           NextMoe 生态共享短链接服务 · 管理员专用控制台
         </p>

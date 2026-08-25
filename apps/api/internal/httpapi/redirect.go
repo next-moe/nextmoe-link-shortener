@@ -6,7 +6,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/kungal/kungal-link-shortener/apps/api/internal/engine"
+	"github.com/next-moe/nextmoe-link-shortener/apps/api/internal/engine"
 )
 
 // RegisterRedirect mounts GET /s/{alias} as a plain Fiber route — it is a

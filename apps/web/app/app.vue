@@ -4,7 +4,7 @@
 // components/<page>/ per the CLAUDE.md splitting rules. KunMessageProvider
 // hosts the toast surface (useKunMessage).
 useHead({
-  title: 'KunGal Link Shortener',
+  title: 'NextMoe Link Shortener',
   htmlAttrs: { lang: 'zh-CN' }
 })
 </script>

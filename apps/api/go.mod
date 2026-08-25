@@ -1,4 +1,4 @@
-module github.com/kungal/kungal-link-shortener/apps/api
+module github.com/next-moe/nextmoe-link-shortener/apps/api
 
 go 1.26
 

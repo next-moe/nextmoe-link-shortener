@@ -8,7 +8,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/kungal/kungal-link-shortener/apps/api/internal/auth"
+	"github.com/next-moe/nextmoe-link-shortener/apps/api/internal/auth"
 )
 
 // AuthBackend carries the OIDC runtime dependencies the /auth endpoints need.
