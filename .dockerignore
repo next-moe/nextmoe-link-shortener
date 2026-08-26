@@ -1,0 +1,37 @@
+# Keep the build context small: without this every `docker build` uploads the
+# whole working tree (node_modules alone is ~600 MB), which is slow locally and
+# wasteful in CI. Both images install/build from the manifests they COPY, so
+# nothing here is needed inside a build.
+.git
+.github
+node_modules
+**/node_modules
+
+# Build outputs — regenerated inside the image, and a host-built one is the
+# wrong architecture.
+.nuxt
+.nitro
+.output
+.data
+.cache
+dist
+apps/api/build
+apps/api/tmp
+
+# Secrets never enter an image layer (.env is git-ignored; this is the second
+# fence, for the case where a build runs on a developer machine).
+.env
+.env.*
+!.env.example
+
+# Local-only tooling, docs and screenshots.
+.vscode
+.idea
+.playwright-mcp
+docker/compose.dev.yml
+scripts
+refs
+*.log
+*.png
+*.md
+!README.md

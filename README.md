@@ -74,16 +74,67 @@ Authorization: Bearer slk_...
 
 完整契约见 `apps/api/openapi/openapi.yaml`（code-first，`pnpm gen` 再生）。
 
-## 部署
+## CI
 
-CI（`.github/workflows/build.yml`）按路径过滤构建镜像推 GHCR：
+| workflow | 触发 | 内容 |
+|---|---|---|
+| `.github/workflows/ci.yml` | push `main` / PR | `api`（go build·vet·test）、`web`（eslint）、`spec`（openapi + TS 类型零漂移）——等价于本地 `pnpm verify` |
+| `.github/workflows/build.yml` | push `main` / 手动 | 按路径过滤构建镜像 → 推 GHCR → 打 Dokploy redeploy webhook |
 
-- `ghcr.io/next-moe/shortlink-api`（distroless，`/s` 跳转 + API）
-- `ghcr.io/next-moe/shortlink-web`（Nitro node-server）
+`build.yml` 只构建输入变了的那个镜像（`apps/api/**` → api，`apps/web/**` + 根清单 →
+web），只改文档的 push 一个镜像都不构建。Actions → Run workflow 可以指定
+`scope=api|web` 强制单独构建。
 
-Dokploy 参照 `docker/compose.dokploy.yml`：web 容器对外，`/api/**` 与 `/s/**`
-由 Nitro 代理到 api 容器；Postgres 用宿主机实例，Redis 随 compose。
-`SHORTLINK_OIDC_*` 等 env 在 Dokploy 面板注入。
+- `ghcr.io/next-moe/shortlink-api` — distroless，约 40 MB，`/s` 跳转 + API
+- `ghcr.io/next-moe/shortlink-web` — Nitro node-server，约 390 MB
+
+> web 镜像的代理目标（`/api/**`、`/s/**` → `http://api:7845`）是 **构建期烘进去的**
+> （Nitro route rules 在 `nuxt build` 时定死），所以它不是面板里的运行时变量；改动
+> 需要改 `build.yml` 的 `API_PROXY_TARGET` 并重建。compose 里 api 服务名必须保持 `api`。
+> API 镜像相反：所有 `SHORTLINK_*` 都是启动时读环境变量，一个镜像跑任何环境。
+
+## 部署（Dokploy）
+
+### 首次部署前
+
+1. **宿主机 Postgres 建库建角色**（生态惯例：一个 Postgres，每个域一个库）：
+   ```sql
+   CREATE ROLE shortlink LOGIN PASSWORD '...';
+   CREATE DATABASE kun_shortlink OWNER shortlink;
+   ```
+   表结构由 API 启动时 GORM AutoMigrate 建，无需单独的 migrate 步骤。
+2. **在 infra 注册生产 OAuth client**（confidential，带 secret），
+   `redirect_uri` 填 `https://<域名>/auth/callback`。
+3. **GHCR 包可见性**：首次推送生成的 package 默认私有。要么在 GitHub →
+   Packages → Package settings 改成 public，要么在 Dokploy 里配一个 registry
+   凭据（用户名 = GitHub 账号，密码 = 带 `read:packages` 的 PAT）。
+4. Dokploy 新建 Compose 应用，内容参照 `docker/compose.dokploy.yml`；web 服务
+   （:3000）绑域名，api 不对外暴露。
+
+### Dokploy 面板要填的环境变量
+
+| 变量 | 必填 | 值 |
+|---|---|---|
+| `SHORTLINK_DB_DSN` | ✅ | `postgres://shortlink:<密码>@host.docker.internal:5432/kun_shortlink?sslmode=disable` |
+| `SHORTLINK_PUBLIC_BASE_URL` | ✅ | 站点对外 origin，如 `https://s.kungal.com`（短链 `<base>/s/<alias>` 由它拼） |
+| `SHORTLINK_OIDC_ISSUER` | ✅ | NextMoe IdP 根，如 `https://oauth.kungal.com`（端点走 discovery，不要硬编码） |
+| `SHORTLINK_OIDC_CLIENT_ID` | ✅ | 上面注册的 client id |
+| `SHORTLINK_OIDC_CLIENT_SECRET` | ✅ | 对应 secret |
+| `SHORTLINK_OIDC_REDIRECT_URI` | ✅ | `https://<域名>/auth/callback`，必须与 IdP 侧登记的完全一致 |
+| `SHORTLINK_ADMIN_ROLES` | ⭕ | 默认 `admin`；逗号分隔，与 JWT roles 取交集才放进控制台 |
+
+`SHORTLINK_MODE=prod`、`SHORTLINK_HOST`、`SHORTLINK_PORT`、
+`SHORTLINK_REDIS_ADDR=redis:6379` 已经写死在 compose 里，不用填。**prod 模式下
+OIDC 四件套和 Redis 缺一个进程就拒绝启动**（`internal/config`），不会带着半截认证跑起来。
+
+### GitHub secrets
+
+| secret | 必填 | 用途 |
+|---|---|---|
+| `DOKPLOY_WEBHOOK_SHORTLINK` | ⭕ | Dokploy 应用的 redeploy webhook URL。不配也不会让 workflow 失败：镜像照推 GHCR，只是不自动触发重新部署 |
+
+GHCR 推送用内置的 `GITHUB_TOKEN`（`packages: write`），无需额外 secret。
+面板里把 `:latest` 换成 `:<sha>` 可以精确回滚（infra 惯例）。
 
 ## License
 

@@ -1,0 +1,81 @@
+# Merge gate for pushes and pull requests: the same three arms as the local
+# `pnpm verify`, split into named jobs so a red check says what broke.
+#
+#   api   — go build · vet · test
+#   web   — eslint over the Nuxt app
+#   spec  — apps/api/openapi/openapi.yaml and apps/web/shared/types/api.d.ts are
+#           BOTH generated (code -> spec -> TS). They are committed, so they can
+#           drift from the code that produces them; this job re-derives and diffs.
+#
+# Deploys are deliberately NOT gated on this (build.yml is an independent
+# workflow, ecosystem convention) — this is the review signal, not the release
+# valve.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: api (build · vet · test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: apps/api/go.mod
+          cache-dependency-path: apps/api/go.sum
+      - run: go build ./...
+      - run: go vet ./...
+      - run: go test ./...
+
+  web:
+    name: web (eslint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      # pnpm before setup-node: the node cache key is computed from the pnpm
+      # store, which needs the binary to exist. The version comes from the root
+      # package.json `packageManager` field, so it is pinned in one place.
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      # The install is not optional for lint: apps/web/eslint.config.mjs imports
+      # ./.nuxt/eslint.config.mjs, which the `nuxt prepare` postinstall writes.
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -F @shortlink/web run lint
+
+  spec:
+    name: spec (openapi + types match the code)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      # Both toolchains: the spec is exported from the Huma code by
+      # `go run ./cmd/spec`, the types from that spec by openapi-typescript.
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: apps/api/go.mod
+          cache-dependency-path: apps/api/go.sum
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm gen
+      - name: Fail if the generated files are stale
+        run: git diff --exit-code -- apps/api/openapi/openapi.yaml apps/web/shared/types/api.d.ts

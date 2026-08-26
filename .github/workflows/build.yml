@@ -1,0 +1,134 @@
+# Build the two service images, push them to GHCR, then ask Dokploy to redeploy.
+#
+# Only the images whose inputs changed are built (path-filtered dynamic matrix),
+# so a docs-only push costs one short `changes` job and builds nothing:
+#   shortlink-api  <- apps/api/** + docker/api.Dockerfile
+#   shortlink-web  <- apps/web/** + root manifests + docker/web.Dockerfile
+#
+# The web image BAKES its proxy target at build time (Nitro route rules are
+# resolved during `nuxt build`), which is why API_PROXY_TARGET is a build-arg
+# here and not a runtime env in the panel. It points at the compose service name
+# `api` — keep that name stable in docker/compose.dokploy.yml.
+#
+# The API image needs no build args at all: every SHORTLINK_* value is read from
+# the environment at startup, so one image runs in any environment.
+name: build-and-push
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: 'What to build (all, or force one image)'
+        type: choice
+        options: [all, api, web]
+        default: all
+
+permissions:
+  contents: read
+  packages: write            # required to push to GHCR
+
+concurrency:                 # a newer push on the same ref cancels the older build
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Decide what to build. On push: only the groups whose paths changed.
+  # On workflow_dispatch: everything, or the one image named by `scope`.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set.outputs.matrix }}
+      any: ${{ steps.set.outputs.any }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v4
+        id: filter
+        if: github.event_name == 'push'
+        with:
+          filters: |
+            api:
+              - 'apps/api/**'
+              - 'docker/api.Dockerfile'
+              - '.github/workflows/build.yml'
+            web:
+              - 'apps/web/**'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'package.json'
+              - 'docker/web.Dockerfile'
+              - '.github/workflows/build.yml'
+      - id: set
+        env:
+          EVENT: ${{ github.event_name }}
+          SCOPE: ${{ github.event.inputs.scope }}
+          API: ${{ steps.filter.outputs.api }}
+          WEB: ${{ steps.filter.outputs.web }}
+        run: |
+          set -euo pipefail
+          catalog='[
+            {"name":"shortlink-api","file":"docker/api.Dockerfile","args":"","group":"api"},
+            {"name":"shortlink-web","file":"docker/web.Dockerfile","args":"API_PROXY_TARGET=http://api:7845","group":"web"}
+          ]'
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            if [ "$SCOPE" = "all" ]; then
+              sel=$(jq -cn --argjson c "$catalog" '$c')
+            else
+              sel=$(jq -cn --argjson c "$catalog" --arg g "$SCOPE" '$c | map(select(.group == $g))')
+            fi
+          else
+            sel=$(jq -cn --argjson c "$catalog" --arg api "$API" --arg web "$WEB" \
+              '([{g:"api",v:$api},{g:"web",v:$web}] | map(select(.v == "true") | .g)) as $grp
+               | $c | map(select(.group as $x | $grp | index($x)))')
+          fi
+          n=$(jq -n --argjson s "$sel" '$s | length')
+          echo "any=$([ "$n" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          printf 'matrix={"include":%s}\n' "$sel" >> "$GITHUB_OUTPUT"
+          echo "Selected $n image(s) to build:"
+          jq -rn --argjson s "$sel" '$s[].name' | sed 's/^/  - /'
+
+  build:
+    needs: changes
+    if: needs.changes.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    name: build ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.changes.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # Context is the repo root for both images: the Go build needs apps/api,
+      # and the pnpm workspace install needs the lockfile plus every manifest.
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          build-args: ${{ matrix.args }}
+          push: true
+          tags: |
+            ghcr.io/next-moe/${{ matrix.name }}:latest
+            ghcr.io/next-moe/${{ matrix.name }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  deploy:
+    needs: [changes, build]
+    if: needs.changes.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Dokploy redeploy
+        env:
+          WEBHOOK: ${{ secrets.DOKPLOY_WEBHOOK_SHORTLINK }}
+        run: |
+          if [ -z "$WEBHOOK" ]; then
+            echo "DOKPLOY_WEBHOOK_SHORTLINK not set — images are in GHCR, skipping the redeploy trigger."
+            exit 0
+          fi
+          curl -fsS -X POST "$WEBHOOK"
