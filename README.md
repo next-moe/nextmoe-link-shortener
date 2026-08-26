@@ -98,37 +98,58 @@ web），只改文档的 push 一个镜像都不构建。Actions → Run workflo
 
 ### 首次部署前
 
-1. **宿主机 Postgres 建库建角色**（生态惯例：一个 Postgres，每个域一个库）：
+1. **在枢纽 Postgres 建库建角色**。生态惯例是整台机一个 Postgres、每个域一个库，
+   它在 infra 的 Compose 应用里，在 `dokploy-network` 上以全局唯一名 `postgres`
+   解析（infra `docs/deploy/12-dokploy.md`）。在 Dokploy Terminal 里对该容器执行：
    ```sql
-   CREATE ROLE shortlink LOGIN PASSWORD '...';
+   CREATE ROLE shortlink LOGIN PASSWORD '<强随机密码>';
    CREATE DATABASE kun_shortlink OWNER shortlink;
    ```
-   表结构由 API 启动时 GORM AutoMigrate 建，无需单独的 migrate 步骤。
-2. **在 infra 注册生产 OAuth client**（confidential，带 secret），
-   `redirect_uri` 填 `https://<域名>/auth/callback`。
-3. **GHCR 包可见性**：首次推送生成的 package 默认私有。要么在 GitHub →
-   Packages → Package settings 改成 public，要么在 Dokploy 里配一个 registry
-   凭据（用户名 = GitHub 账号，密码 = 带 `read:packages` 的 PAT）。
-4. Dokploy 新建 Compose 应用，compose 文件用仓库根的 **`docker-compose.prod.yml`**：
-   web 绑域名（`expose: 3000`，Traefik 内部路由），api 和 redis 不对外暴露。
-   Postgres 不在这个文件里 —— DSN 是面板变量，指宿主机实例或另一个 Dokploy 应用
-   都行；表由 API 启动时 AutoMigrate 建，没有单独的 migrate 服务。
+   表结构由 API 启动时 GORM AutoMigrate 建，没有 migrate 服务。连接池封顶 20
+   （`internal/db`），对枢纽的 `max_connections=200` 无压力。
+2. **在 IdP 注册生产 OAuth client**：`kun_galgame_infra.oauth_clients` 插一行，
+   confidential（`is_public=false`）+ PKCE，`secret` 列存的是 `sha256:<hex>`，
+   明文只填进 Dokploy 面板。哈希在库外算：`printf %s '<明文>' | sha256sum`。
+   字段形状照 `scripts/register-dev-oidc-client.sh`，`redirect_uris` 填
+   `["https://<域名>/auth/callback"]`，`allowed_scopes` 至少覆盖 RP 请求的
+   `openid profile`。
+3. **GHCR 包是私有的**：在 Dokploy → Settings → Registry 加一个 `ghcr.io` 凭据
+   （用户名 = GitHub 账号，密码 = 带 `read:packages` 的 PAT）。
+4. **新建 Compose 应用**：Git provider 指向本仓库、分支 `main`、Compose Path
+   填 `docker-compose.prod.yml`。
+
+### 域名（Domains 面板）
+
+| 域名 | Path | Service | Container Port |
+|---|---|---|---|
+| 站点域名 | `/` | `web` | `3000` |
+
+**只给 web 挂域名。** `/api/**` 和 `/s/**` 由 Nitro 在容器网络内转发到
+`shortlink-api:7845`，给 api 再加一条 path 记录会把 BFF 的同源前提打破。
+
+⚠️ compose 里**绝不能出现 `labels:` 块**：compose labels 会整体顶掉面板注入的
+Traefik labels，域名会静默 404（infra 在 oauth 上踩过）。本仓的
+`docker-compose.prod.yml` 因此一个 label 都没有。
+
+Cloudflare 在前面时，SSL/TLS 模式要用 **Full (strict)**；Flexible 会和 Traefik 的
+80→443 跳转打成重定向环。
 
 ### Dokploy 面板要填的环境变量
 
 | 变量 | 必填 | 值 |
 |---|---|---|
-| `SHORTLINK_DB_DSN` | ✅ | `postgres://shortlink:<密码>@host.docker.internal:5432/kun_shortlink?sslmode=disable` |
-| `SHORTLINK_PUBLIC_BASE_URL` | ✅ | 站点对外 origin，如 `https://s.kungal.com`（短链 `<base>/s/<alias>` 由它拼） |
-| `SHORTLINK_OIDC_ISSUER` | ✅ | NextMoe IdP 根，如 `https://oauth.kungal.com`（端点走 discovery，不要硬编码） |
+| `SHORTLINK_DB_DSN` | ✅ | `postgres://shortlink:<密码>@postgres:5432/kun_shortlink?sslmode=disable` |
+| `SHORTLINK_PUBLIC_BASE_URL` | ✅ | 站点对外 origin（短链 `<base>/s/<alias>` 由它拼） |
+| `SHORTLINK_OIDC_ISSUER` | ✅ | `https://oauth.kungal.com`（端点走 discovery，不要硬编码） |
 | `SHORTLINK_OIDC_CLIENT_ID` | ✅ | 上面注册的 client id |
-| `SHORTLINK_OIDC_CLIENT_SECRET` | ✅ | 对应 secret |
+| `SHORTLINK_OIDC_CLIENT_SECRET` | ✅ | 对应的**明文** secret |
 | `SHORTLINK_OIDC_REDIRECT_URI` | ✅ | `https://<域名>/auth/callback`，必须与 IdP 侧登记的完全一致 |
 | `SHORTLINK_ADMIN_ROLES` | ⭕ | 默认 `admin`；逗号分隔，与 JWT roles 取交集才放进控制台 |
 
 `SHORTLINK_MODE=prod`、`SHORTLINK_HOST`、`SHORTLINK_PORT`、
-`SHORTLINK_REDIS_ADDR=redis:6379` 已经写死在 compose 里，不用填。**prod 模式下
-OIDC 四件套和 Redis 缺一个进程就拒绝启动**（`internal/config`），不会带着半截认证跑起来。
+`SHORTLINK_REDIS_ADDR=shortlink-redis:6379` 已经写死在 compose 里，不用填。
+**prod 模式下 OIDC 四件套和 Redis 缺一个，进程就拒绝启动**（`internal/config`），
+不会带着半截认证跑起来；面板里少填一个则 compose 插值直接失败，连容器都不会建。
 
 ### GitHub secrets
 

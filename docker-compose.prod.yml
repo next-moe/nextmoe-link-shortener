@@ -9,12 +9,14 @@
 #      deploy-specifics come from Dokploy's Environment panel via ${VAR}.
 #      `${VAR:?msg}` means the deploy fails loudly instead of starting a broken
 #      container.
-#   4. Postgres is NOT in this file. Ecosystem convention is one Postgres per
-#      host with a database per domain, so the DSN is a panel value — it can
-#      point at the host instance (host.docker.internal, wired below) or at
-#      another Dokploy app's Postgres on dokploy-network. Create the database
-#      and role before the first deploy; the schema itself is GORM AutoMigrate
-#      at API startup, so there is no migrate job here.
+#   4. Postgres is NOT in this file. Ecosystem convention is one Postgres for
+#      the whole host with a database per domain: it lives in the infra Compose
+#      app and answers to the globally-unique name `postgres` on
+#      dokploy-network (infra docs/deploy/12-dokploy.md). So the DSN is a panel
+#      value — normally `@postgres:5432`, or host.docker.internal (wired below)
+#      if this host keeps Postgres outside Docker. Create the database and role
+#      before the first deploy; the schema itself is GORM AutoMigrate at API
+#      startup, so there is no migrate job here.
 #
 # Set these in the Dokploy Environment panel:
 #   SHORTLINK_DB_DSN  SHORTLINK_PUBLIC_BASE_URL  SHORTLINK_OIDC_ISSUER
@@ -66,7 +68,7 @@ services:
       SHORTLINK_PORT: '7845'
       # Panel values. `:?` so a missing one stops the deploy here, with the
       # message, instead of crash-looping the container.
-      SHORTLINK_DB_DSN: ${SHORTLINK_DB_DSN:?postgres DSN, e.g. postgres://shortlink:PASSWORD@host.docker.internal:5432/kun_shortlink?sslmode=disable}
+      SHORTLINK_DB_DSN: ${SHORTLINK_DB_DSN:?postgres DSN, e.g. postgres://shortlink:PASSWORD@postgres:5432/kun_shortlink?sslmode=disable}
       SHORTLINK_PUBLIC_BASE_URL: ${SHORTLINK_PUBLIC_BASE_URL:?public origin short links are built from, e.g. https://s.kungal.com}
       SHORTLINK_OIDC_ISSUER: ${SHORTLINK_OIDC_ISSUER:?NextMoe IdP root; endpoints come from discovery}
       SHORTLINK_OIDC_CLIENT_ID: ${SHORTLINK_OIDC_CLIENT_ID:?set SHORTLINK_OIDC_CLIENT_ID}
@@ -75,8 +77,9 @@ services:
       SHORTLINK_ADMIN_ROLES: ${SHORTLINK_ADMIN_ROLES:-admin}
       # Project-unique alias, not plain `redis` — see the networks note below.
       SHORTLINK_REDIS_ADDR: shortlink-redis:6379
-    # Lets SHORTLINK_DB_DSN address the host's own Postgres. Harmless when the
-    # DSN points somewhere else.
+    # Only needed when the DSN points at a Postgres running outside Docker on
+    # this host; harmless otherwise (the hub's `postgres` resolves over
+    # dokploy-network, which this service already joins).
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     depends_on:
