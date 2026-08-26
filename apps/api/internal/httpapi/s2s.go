@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -35,6 +36,16 @@ func (h *handlers) registerS2S(api huma.API) {
 		Tags:        []string{"s2s"},
 		Security:    []map[string][]string{{"apiKey": {}}},
 	}, h.s2sGetLink)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "s2s-daily-stats",
+		Method:      http.MethodPost,
+		Path:        "/s2s/stats/daily",
+		Summary:     "Batch daily visit stats for a set of aliases",
+		Description: "Per-alias daily totals and deduplicated visitor counts over an inclusive JST date range (at most 92 days, at most 500 aliases). Days without traffic are omitted; an alias that does not exist yields an empty array rather than failing the batch.",
+		Tags:        []string{"s2s"},
+		Security:    []map[string][]string{{"apiKey": {}}},
+	}, h.s2sDailyStats)
 }
 
 // requireAPIKey authenticates the Bearer token against the api_key table.
@@ -121,4 +132,79 @@ func (h *handlers) s2sGetLink(_ context.Context, in *s2sGetLinkInput) (*linkOutp
 		return nil, mapLinkErr("s2s get link", err)
 	}
 	return &linkOutput{Body: h.toLinkDTO(link)}, nil
+}
+
+// ---- daily stats ----
+
+// maxStatsRangeDays bounds one batch stats query (inclusive day count).
+const maxStatsRangeDays = 92
+
+// DailyStatsBody is the batch stats request.
+type DailyStatsBody struct {
+	Aliases []string `json:"aliases" minItems:"1" maxItems:"500" doc:"Short link aliases to report on"`
+	From    string   `json:"from" format:"date" doc:"First JST day, inclusive (YYYY-MM-DD)"`
+	To      string   `json:"to" format:"date" doc:"Last JST day, inclusive (YYYY-MM-DD)"`
+}
+
+// DailyStatDTO is one JST day of counters for one alias.
+type DailyStatDTO struct {
+	Date    string `json:"date" doc:"JST calendar day (YYYY-MM-DD)"`
+	Total   int64  `json:"total" doc:"All hits recorded that day"`
+	Uniques int64  `json:"uniques" doc:"Distinct visitor fingerprints that day"`
+}
+
+// DailyStatsResult maps each requested alias to its days with traffic.
+type DailyStatsResult struct {
+	Stats map[string][]DailyStatDTO `json:"stats" doc:"Alias to its days with traffic, ascending; unknown aliases map to an empty array"`
+}
+
+type s2sDailyStatsInput struct {
+	Authorization string `header:"Authorization" doc:"Bearer slk_..."`
+	Body          DailyStatsBody
+}
+
+type s2sDailyStatsOutput struct {
+	Body DailyStatsResult
+}
+
+func (h *handlers) s2sDailyStats(_ context.Context, in *s2sDailyStatsInput) (*s2sDailyStatsOutput, error) {
+	if _, err := h.requireAPIKey(in.Authorization); err != nil {
+		return nil, err
+	}
+	// minItems does not cover an explicit null: a Go slice is nullable, so the
+	// generated schema accepts null and only this check rejects it.
+	if len(in.Body.Aliases) == 0 {
+		return nil, huma.Error422UnprocessableEntity("aliases must hold at least one alias")
+	}
+	from, err := engine.ParseDate(in.Body.From)
+	if err != nil {
+		return nil, huma.Error422UnprocessableEntity("from must be a YYYY-MM-DD date")
+	}
+	to, err := engine.ParseDate(in.Body.To)
+	if err != nil {
+		return nil, huma.Error422UnprocessableEntity("to must be a YYYY-MM-DD date")
+	}
+	if to.Before(from) {
+		return nil, huma.Error422UnprocessableEntity("to must not precede from")
+	}
+	if int(to.Sub(from).Hours()/24)+1 > maxStatsRangeDays {
+		return nil, huma.Error422UnprocessableEntity(
+			fmt.Sprintf("the range must span at most %d days", maxStatsRangeDays))
+	}
+
+	stats, err := h.engine.DailyStats(in.Body.Aliases, from, to)
+	if err != nil {
+		slog.Error("s2s daily stats", "error", err)
+		return nil, huma.Error500InternalServerError("internal error")
+	}
+	out := &s2sDailyStatsOutput{}
+	out.Body.Stats = make(map[string][]DailyStatDTO, len(stats))
+	for alias, days := range stats {
+		dtos := make([]DailyStatDTO, len(days))
+		for i, d := range days {
+			dtos[i] = DailyStatDTO{Date: d.Date, Total: d.Total, Uniques: d.Uniques}
+		}
+		out.Body.Stats[alias] = dtos
+	}
+	return out, nil
 }

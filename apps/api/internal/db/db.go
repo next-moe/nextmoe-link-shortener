@@ -39,6 +39,8 @@ func Open(dsn string) (*DB, error) {
 		&model.ShortLink{},
 		&model.ShortLinkVisit{},
 		&model.ShortLinkVisitBucket{},
+		&model.ShortLinkVisitorDay{},
+		&model.ShortLinkVisitDay{},
 		&model.APIKey{},
 	); err != nil {
 		return nil, fmt.Errorf("db automigrate: %w", err)
