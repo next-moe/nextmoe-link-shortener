@@ -1,18 +1,13 @@
 <script setup lang="ts">
 // Home is the service's front page, not a login form: the login action lives
 // in the top bar (ShellNav) where it sits on every route. An already-signed-in
-// admin never reads this page — they are sent straight to the dashboard.
-const { user, fetched, fetchMe } = useAuth()
-const router = useRouter()
-
-onMounted(async () => {
-  if (!fetched.value) {
-    await fetchMe()
-  }
-  if (user.value?.isAdmin) {
-    await router.replace('/dash')
-  }
-})
+// admin never reaches this page at all — the `guest` middleware sends them to
+// the dashboard before it renders.
+//
+// The identity is known during SSR (plugins/auth.ts), so the notice below is
+// part of the first paint rather than something that appears afterwards and
+// pushes the cards down the page.
+const { user } = useAuth()
 
 // What the console actually does — the reason someone is looking at this page.
 const capabilities = [
@@ -51,22 +46,20 @@ const capabilities = [
         短链，查看每条链接的访问情况，并为兄弟站点签发 S2S API key。
       </p>
 
-      <ClientOnly>
-        <!-- The IdP account exists but lacks the admin role. This service has
-             no self-serve signup, so the only way forward is a human. -->
-        <KunInfo
-          v-if="user && !user.isAdmin"
-          class="max-w-xl text-left"
-          color="warning"
-          variant="flat"
-          icon="lucide:shield-alert"
-          title="没有控制台权限"
-          :description="`账号 ${user.name} 已登录，但没有管理员角色。本服务不开放自助注册，请联系生态管理员开通。`"
-        />
-        <p v-else-if="fetched" class="text-sm text-default-400">
-          使用右上角的「登录」按钮，通过 NextMoe 统一身份进入控制台。
-        </p>
-      </ClientOnly>
+      <!-- The IdP account exists but lacks the admin role. This service has
+           no self-serve signup, so the only way forward is a human. -->
+      <KunInfo
+        v-if="user"
+        class="max-w-xl text-left"
+        color="warning"
+        variant="flat"
+        icon="lucide:shield-alert"
+        title="没有控制台权限"
+        :description="`账号 ${user.name} 已登录，但没有管理员角色。本服务不开放自助注册，请联系生态管理员开通。`"
+      />
+      <p v-else class="text-sm text-default-400">
+        使用右上角的「登录」按钮，通过 NextMoe 统一身份进入控制台。
+      </p>
     </section>
 
     <ul class="grid grid-cols-1 gap-4 sm:grid-cols-3">

@@ -2,21 +2,16 @@
 // The console's top bar: brand, primary navigation with an active state, the
 // theme switch, and the signed-in identity.
 //
-// The identity is resolved client-side (the session cookie is read by the BFF,
-// and every dashboard fetch is client-only), so the auth-dependent half of the
-// bar is wrapped in <ClientOnly>. Rendering it unguarded is what produced the
-// hydration mismatch this component used to log on every page load: the server
-// had no user and emitted a different node count than the client.
-const { user, fetched, fetchMe, login, logout } = useAuth()
+// Every auth-dependent branch here renders on the SERVER: plugins/auth.ts
+// resolves the identity before the first render, so the markup the browser
+// receives is already the final one. It used to sit behind <ClientOnly> and
+// wait for an after-mount fetch, so the bar shipped empty and then grew a
+// login button (or an avatar and two nav links) — a layout shift on every
+// single page load.
+const { user, login, logout } = useAuth()
 const { mode, toggle } = useTheme()
 const route = useRoute()
 const router = useRouter()
-
-onMounted(async () => {
-  if (!fetched.value) {
-    await fetchMe()
-  }
-})
 
 // Login lives here rather than on the home page: it is the same action from
 // every route, so it belongs in the persistent bar next to the identity it
@@ -73,28 +68,26 @@ const isActive = (to: string) => route.path === to
         </span>
       </NuxtLink>
 
-      <ClientOnly>
-        <div v-if="user?.isAdmin" class="ml-1 flex items-center gap-1 sm:ml-4">
-          <NuxtLink
-            v-for="link in links"
-            :key="link.to"
-            :to="link.to"
-            class="flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-2 text-sm transition-colors sm:px-3"
-            :class="
-              isActive(link.to)
-                ? 'bg-primary-100 font-medium text-primary-700'
-                : 'text-default-600 hover:bg-default-100'
-            "
-            :aria-current="isActive(link.to) ? 'page' : undefined"
-            :aria-label="link.label"
-          >
-            <KunIcon :name="link.icon" class="text-base" />
-            <!-- Narrow viewports keep the icon and drop the label: two wrapped
-                 two-character labels are less legible than two clear icons. -->
-            <span class="hidden sm:inline">{{ link.label }}</span>
-          </NuxtLink>
-        </div>
-      </ClientOnly>
+      <div v-if="user?.isAdmin" class="ml-1 flex items-center gap-1 sm:ml-4">
+        <NuxtLink
+          v-for="link in links"
+          :key="link.to"
+          :to="link.to"
+          class="flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-2 text-sm transition-colors sm:px-3"
+          :class="
+            isActive(link.to)
+              ? 'bg-primary-100 font-medium text-primary-700'
+              : 'text-default-600 hover:bg-default-100'
+          "
+          :aria-current="isActive(link.to) ? 'page' : undefined"
+          :aria-label="link.label"
+        >
+          <KunIcon :name="link.icon" class="text-base" />
+          <!-- Narrow viewports keep the icon and drop the label: two wrapped
+               two-character labels are less legible than two clear icons. -->
+          <span class="hidden sm:inline">{{ link.label }}</span>
+        </NuxtLink>
+      </div>
 
       <div class="grow" />
 
@@ -110,46 +103,42 @@ const isActive = (to: string) => route.path === to
         </KunButton>
       </KunTooltip>
 
-      <ClientOnly>
-        <div v-if="user" class="flex items-center gap-2">
-          <span
-            class="hidden items-center gap-2 rounded-full bg-default-100 py-1 pl-1 pr-3 sm:flex"
-          >
-            <span
-              class="flex size-6 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground"
-              aria-hidden="true"
-            >{{ user.name.slice(0, 1).toUpperCase() }}</span>
-            <span class="max-w-32 truncate text-xs">{{ user.name }}</span>
-          </span>
-          <KunTooltip text="退出登录">
-            <KunButton
-              variant="light"
-              size="sm"
-              color="danger"
-              is-icon-only
-              aria-label="退出登录"
-              @click="handleLogout"
-            >
-              <KunIcon name="lucide:log-out" />
-            </KunButton>
-          </KunTooltip>
-        </div>
-
-        <!-- Rendered only once the identity is known, so the bar never flashes
-             a login button at someone who is already signed in. -->
-        <KunButton
-          v-else-if="fetched"
-          size="sm"
-          icon
-          :loading="starting"
-          @click="handleLogin"
+      <div v-if="user" class="flex items-center gap-2">
+        <span
+          class="hidden items-center gap-2 rounded-full bg-default-100 py-1 pl-1 pr-3 sm:flex"
         >
-          <template #icon>
-            <KunIcon name="lucide:log-in" />
-          </template>
-          登录
-        </KunButton>
-      </ClientOnly>
+          <span
+            class="flex size-6 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground"
+            aria-hidden="true"
+          >{{ user.name.slice(0, 1).toUpperCase() }}</span>
+          <span class="max-w-32 truncate text-xs">{{ user.name }}</span>
+        </span>
+        <KunTooltip text="退出登录">
+          <KunButton
+            variant="light"
+            size="sm"
+            color="danger"
+            is-icon-only
+            aria-label="退出登录"
+            @click="handleLogout"
+          >
+            <KunIcon name="lucide:log-out" />
+          </KunButton>
+        </KunTooltip>
+      </div>
+
+      <KunButton
+        v-else
+        size="sm"
+        icon
+        :loading="starting"
+        @click="handleLogin"
+      >
+        <template #icon>
+          <KunIcon name="lucide:log-in" />
+        </template>
+        登录
+      </KunButton>
     </nav>
   </header>
 </template>

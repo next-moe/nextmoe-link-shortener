@@ -26,6 +26,15 @@ export default defineNuxtConfig({
   // short-link 302 would be consumed by Nitro and the destination HTML
   // streamed back as 200. The browser must see the Location itself.
   routeRules: {
+    // The page HTML now varies per viewer: the identity is resolved during SSR
+    // (plugins/auth.ts) so the top bar ships signed-in, which means a shared
+    // cache must never hand one admin's render to the next visitor. Assets
+    // under /_nuxt are content-hashed and keep their own immutable headers.
+    '/': { headers: { 'cache-control': 'private, no-cache' } },
+    '/dash': { headers: { 'cache-control': 'private, no-cache' } },
+    '/keys': { headers: { 'cache-control': 'private, no-cache' } },
+    '/auth/**': { headers: { 'cache-control': 'private, no-cache' } },
+
     '/api/**': {
       proxy: { to: `${apiProxyTarget}/**`, fetchOptions: { redirect: 'manual' } }
     },

@@ -2,6 +2,10 @@
 // (/auth/me), starts the OIDC login, and logs out. All calls go to the
 // same-origin /api prefix (proxied to the Go API), so the httpOnly session
 // cookie rides along and no token ever touches this code.
+//
+// The identity resolves during SSR (see plugins/auth.ts), so every render —
+// server and client — already knows who is signed in. That is what keeps the
+// top bar from swapping a login button for an avatar after hydration.
 
 export interface AuthUser {
   userId: number
@@ -28,10 +32,16 @@ export const useAuth = () => {
   const user = useState<AuthUser | null>('auth-user', () => null)
   const fetched = useState<boolean>('auth-fetched', () => false)
 
+  // useRequestFetch forwards the INCOMING request's headers on the server, so
+  // the browser's session cookie reaches the BFF during SSR; on the client it
+  // is plain $fetch. Capture it here, in setup context, because it needs the
+  // current request event.
+  const request = useRequestFetch()
+
   // fetchMe resolves the current identity, or null when anonymous (401).
   const fetchMe = async (): Promise<AuthUser | null> => {
     try {
-      const me = await $fetch<MeResponse>('/api/auth/me')
+      const me = await request<MeResponse>('/api/auth/me')
       user.value = {
         userId: me.user_id,
         name: me.name,
