@@ -38,8 +38,11 @@ export interface LinkStatsDTO {
   link: LinkDTO
   range_days: number
   unique_visitors: number
+  range_visits: number
+  range_unique: number
   buckets: BucketDTO[]
   recent: VisitDTO[]
+  referrers: ReferrerDTO[]
 }
 
 export interface KeyDTO {
@@ -68,4 +71,47 @@ export interface UpdateLinkPayload {
   expires_at: string | null
   max_visits: number
   forward_params: boolean
+}
+
+export interface ReferrerDTO {
+  // Empty host = the visit carried no Referer (direct traffic).
+  host: string
+  visits: number
+}
+
+export interface OverviewTotalsDTO {
+  links: number
+  active_links: number
+  disabled_links: number
+  archived_links: number
+  all_time_visits: number
+  range_visits: number
+  range_unique: number
+  prev_visits: number
+  prev_unique: number
+  keys: number
+  active_keys: number
+}
+
+export interface OverviewLinkDTO {
+  link: LinkDTO
+  range_visits: number
+  range_unique: number
+}
+
+export interface OverviewSourceDTO {
+  created_via: string
+  links: number
+  range_visits: number
+}
+
+export interface OverviewDTO {
+  range_days: number
+  range_start: string
+  totals: OverviewTotalsDTO
+  // Hourly buckets summed across links; sparse (empty hours are omitted).
+  series: BucketDTO[]
+  links: OverviewLinkDTO[]
+  sources: OverviewSourceDTO[]
+  referrers: ReferrerDTO[]
 }

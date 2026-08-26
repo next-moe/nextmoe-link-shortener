@@ -29,3 +29,6 @@ apps/api/tmp
 
 # ref docs
 refs
+
+# Playwright MCP artifacts
+.playwright-mcp

@@ -5,7 +5,13 @@
 // hosts the toast surface (useKunMessage).
 useHead({
   title: 'NextMoe Link Shortener',
-  htmlAttrs: { lang: 'zh-CN' }
+  htmlAttrs: { lang: 'zh-CN' },
+  meta: [
+    {
+      name: 'description',
+      content: 'NextMoe 生态共享短链接服务 · 管理员控制台'
+    }
+  ]
 })
 </script>
 

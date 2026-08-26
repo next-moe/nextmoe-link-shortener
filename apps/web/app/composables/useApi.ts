@@ -6,6 +6,7 @@ import type {
   KeyDTO,
   LinkDTO,
   LinkStatsDTO,
+  OverviewDTO,
   UpdateLinkPayload
 } from '~~/shared/types/shortlink'
 
@@ -17,6 +18,12 @@ export const useApi = () => {
     $fetch<T>(`/api${path}`, { credentials: 'include', ...opts }) as Promise<T>
 
   return {
+    // ---- dashboard read model ----
+    // One call answers the whole console: totals, the traffic series, and the
+    // per-link / source / referrer breakdowns.
+    overview: (range: number) =>
+      apiFetch<OverviewDTO>(`/stats/overview?range=${range}`),
+
     // ---- links ----
     listLinks: () => apiFetch<{ links: LinkDTO[] }>('/links'),
     createLink: (payload: CreateLinkPayload) =>

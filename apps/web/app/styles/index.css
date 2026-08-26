@@ -21,6 +21,17 @@
 @source '../../node_modules/@kungal/ui-core';
 
 @layer base {
+  /* Tell the UA which palette native controls should paint themselves in.
+     Without this the date/time picker, its calendar popup, and the default
+     scrollbars stay light-themed on the dark surface. */
+  :root {
+    color-scheme: light;
+  }
+
+  .kun-dark-mode {
+    color-scheme: dark;
+  }
+
   html,
   body {
     /* Solid background — KunUI's dark variant only swaps CSS vars, so the
