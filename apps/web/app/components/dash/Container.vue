@@ -7,7 +7,7 @@
 // height and left a screen-tall hole in the middle of the page.
 import type { LinkDTO, OverviewLinkDTO } from '~~/shared/types/shortlink'
 
-const { range, data, pending, load, setRange, granularity, points } =
+const { range, data, pending, error, load, setRange, granularity, points } =
   useOverview()
 const { deleteLink } = useApi()
 
@@ -184,11 +184,7 @@ const handleCreated = async (link: LinkDTO) => {
       </div>
     </header>
 
-    <div v-if="!data && pending" class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-      <KunSkeleton v-for="i in 4" :key="i" height="8rem" rounded="lg" />
-    </div>
-
-    <template v-else-if="totals">
+    <template v-if="totals">
       <section
         class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
         aria-label="关键指标"
@@ -287,7 +283,17 @@ const handleCreated = async (link: LinkDTO) => {
       />
     </template>
 
-    <KunNull v-else description="加载控制台数据失败，请刷新重试" />
+    <!-- Branch on what is actually known, in that order: numbers, a failed
+         load, or a load still in flight. The old order asked `pending` first,
+         so the very first render — nothing fetched yet, nothing failed yet —
+         fell through to the error state and the server shipped "加载失败" as
+         the console's first paint. -->
+    <KunNull
+      v-else-if="error"
+      description="加载控制台数据失败，请刷新重试"
+    />
+
+    <DashSkeleton v-else />
 
     <DashLinkDrawer
       v-model="showDrawer"

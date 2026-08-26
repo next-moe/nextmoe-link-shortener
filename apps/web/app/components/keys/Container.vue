@@ -127,8 +127,13 @@ const copySample = async () => {
         <p class="text-sm text-default-500">
           生态站点（kungal / moyu / letmoe …）用这些 key 调用短链接口
         </p>
-        <p v-if="!loading" class="text-xs text-default-400">
-          共 {{ keys.length }} 个 key · {{ activeCount }} 个启用中
+        <!-- Always one line, loading or not: a count that appears after the
+             fetch would push the whole page down by its own height. -->
+        <p class="text-xs text-default-400">
+          <template v-if="loading">正在读取 key 列表…</template>
+          <template v-else>
+            共 {{ keys.length }} 个 key · {{ activeCount }} 个启用中
+          </template>
         </p>
       </div>
       <KunButton icon @click="showCreate = true">
@@ -141,9 +146,17 @@ const copySample = async () => {
 
     <KunCard padding="none" class="overflow-hidden">
       <div class="flex flex-col">
-        <div v-if="loading" class="flex flex-col gap-3 p-6">
-          <KunSkeleton v-for="i in 3" :key="i" height="2.75rem" />
-        </div>
+        <!-- Placeholder rows stand exactly where real rows will, so the card
+             below this one does not get pushed down when the keys arrive. The
+             two heights are measured, not guessed: a key row is a fixed shape
+             (icon · name+status · two meta lines · two buttons), and below the
+             `sm` breakpoint those three columns each wrap onto their own line,
+             which makes the row 192px instead of 78px. -->
+        <ul v-if="loading" class="divide-y divide-kun" aria-hidden="true">
+          <li v-for="i in 3" :key="i" class="h-48 p-4 sm:h-[4.875rem] sm:px-5">
+            <KunSkeleton height="100%" rounded="lg" />
+          </li>
+        </ul>
 
         <div v-else-if="!keys.length" class="p-6">
           <KunNull description="还没有 API key，点击右上角创建第一个" />

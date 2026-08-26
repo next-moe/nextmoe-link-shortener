@@ -4,6 +4,13 @@
 // tiles, chart, breakdowns, table — so the numbers on screen always agree.
 // A refetch deliberately keeps `data` in place and only raises `pending`, so
 // the charts hold their previous render instead of flashing a skeleton.
+//
+// This load stays on the client on purpose. The series is bucketed against the
+// VIEWER's midnight (shared/utils/series.ts) and its axis is formatted in the
+// viewer's timezone, so a server render would be built on the server's clock
+// and the client would hydrate a different axis. `error` is what separates
+// "the fetch failed" from "nothing has been fetched yet" — the two used to
+// share a branch, and the console's first paint was an error message.
 import type { OverviewDTO } from '~~/shared/types/shortlink'
 
 export const useOverview = () => {
