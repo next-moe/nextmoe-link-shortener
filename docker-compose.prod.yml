@@ -12,11 +12,13 @@
 #   4. Postgres is NOT in this file. Ecosystem convention is one Postgres for
 #      the whole host with a database per domain: it lives in the infra Compose
 #      app and answers to the globally-unique name `postgres` on
-#      dokploy-network (infra docs/deploy/12-dokploy.md). So the DSN is a panel
-#      value — normally `@postgres:5432`, or host.docker.internal (wired below)
-#      if this host keeps Postgres outside Docker. Create the database and role
-#      before the first deploy; the schema itself is GORM AutoMigrate at API
-#      startup, so there is no migrate job here.
+#      dokploy-network (infra docs/deploy/12-dokploy.md), so the DSN host is
+#      always `postgres` — NOT host.docker.internal, which resolves to the
+#      host itself, where nothing listens on 5432 (a hung connect, not a
+#      refusal). CREATE THE ROLE AND DATABASE BEFORE THE FIRST DEPLOY — see
+#      README "首次部署前". Only the TABLES are automatic (GORM AutoMigrate at
+#      API startup), which is why there is no migrate job here; nothing in this
+#      stack creates the database itself.
 #
 # Set these in the Dokploy Environment panel:
 #   SHORTLINK_DB_DSN  SHORTLINK_PUBLIC_BASE_URL  SHORTLINK_OIDC_ISSUER
@@ -77,11 +79,6 @@ services:
       SHORTLINK_ADMIN_ROLES: ${SHORTLINK_ADMIN_ROLES:-admin}
       # Project-unique alias, not plain `redis` — see the networks note below.
       SHORTLINK_REDIS_ADDR: shortlink-redis:6379
-    # Only needed when the DSN points at a Postgres running outside Docker on
-    # this host; harmless otherwise (the hub's `postgres` resolves over
-    # dokploy-network, which this service already joins).
-    extra_hosts:
-      - 'host.docker.internal:host-gateway'
     depends_on:
       redis:
         condition: service_healthy

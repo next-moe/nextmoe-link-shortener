@@ -98,15 +98,23 @@ web），只改文档的 push 一个镜像都不构建。Actions → Run workflo
 
 ### 首次部署前
 
-1. **在枢纽 Postgres 建库建角色**。生态惯例是整台机一个 Postgres、每个域一个库，
-   它在 infra 的 Compose 应用里，在 `dokploy-network` 上以全局唯一名 `postgres`
-   解析（infra `docs/deploy/12-dokploy.md`）。在 Dokploy Terminal 里对该容器执行：
+1. **在枢纽 Postgres 建角色建库（必做，没有任何东西会替你建）**。生态惯例是整台机
+   一个 Postgres、每个域一个库，它在 infra 的 Compose 应用里，在 `dokploy-network`
+   上以全局唯一名 `postgres` 解析（infra `docs/deploy/12-dokploy.md`）——DSN 的
+   主机名永远是 `postgres`，**不是 `host.docker.internal`**（那指向宿主机，5432
+   上没有东西监听）。在 Dokploy Terminal 里对该容器执行：
    ```sql
    CREATE ROLE shortlink LOGIN PASSWORD '<强随机密码>';
    CREATE DATABASE kun_shortlink OWNER shortlink;
    ```
-   表结构由 API 启动时 GORM AutoMigrate 建，没有 migrate 服务。连接池封顶 20
-   （`internal/db`），对枢纽的 `max_connections=200` 无压力。
+   `OWNER shortlink` 不能省：PG 15+ 起 `public` schema 只对库 owner 开放，否则
+   AutoMigrate 会以 `permission denied for schema public` 失败。**自动的只有表**
+   （API 启动时 GORM AutoMigrate，所以没有 migrate 服务），库和角色是人工前置。
+   建完就地自测一次，没有输出即为成功：
+   ```bash
+   PGPASSWORD='<密码>' psql -h 127.0.0.1 -U shortlink -d kun_shortlink -c '\q'
+   ```
+   连接池封顶 20（`internal/db`），对枢纽的 `max_connections=200` 无压力。
 2. **在 IdP 注册生产 OAuth client**：`kun_galgame_infra.oauth_clients` 插一行，
    confidential（`is_public=false`）+ PKCE，`secret` 列存的是 `sha256:<hex>`，
    明文只填进 Dokploy 面板。哈希在库外算：`printf %s '<明文>' | sha256sum`。
@@ -144,12 +152,34 @@ Cloudflare 在前面时，SSL/TLS 模式要用 **Full (strict)**；Flexible 会�
 | `SHORTLINK_OIDC_CLIENT_ID` | ✅ | 上面注册的 client id |
 | `SHORTLINK_OIDC_CLIENT_SECRET` | ✅ | 对应的**明文** secret |
 | `SHORTLINK_OIDC_REDIRECT_URI` | ✅ | `https://<域名>/auth/callback`，必须与 IdP 侧登记的完全一致 |
-| `SHORTLINK_ADMIN_ROLES` | ⭕ | 默认 `admin`；逗号分隔，与 JWT roles 取交集才放进控制台 |
+| `SHORTLINK_ADMIN_ROLES` | ⭕ | 默认 `admin`。逗号分隔的角色名白名单，与调用者的**有效角色**（`roles` ∪ `site_roles`）取交集才放进控制台；精确匹配，不认层级。想只放生态最高角色进来就填 `ren` |
 
 `SHORTLINK_MODE=prod`、`SHORTLINK_HOST`、`SHORTLINK_PORT`、
 `SHORTLINK_REDIS_ADDR=shortlink-redis:6379` 已经写死在 compose 里，不用填。
 **prod 模式下 OIDC 四件套和 Redis 缺一个，进程就拒绝启动**（`internal/config`），
 不会带着半截认证跑起来；面板里少填一个则 compose 插值直接失败，连容器都不会建。
+
+### 部署后验证
+
+```bash
+curl -sI https://<域名>/            # 200，证书有效
+curl -sI https://<域名>/api/auth/me # 401（匿名）= web 的代理打到 api 了
+curl -sI https://<域名>/s/nope      # 404 = 跳转路由在答
+```
+
+### 排错
+
+| 症状 | 真实原因 |
+|---|---|
+| 页面能开，但点「登录」弹**「无法开始登录，请稍后重试」**，且 `/api/**`、`/s/**` 全 502 | 这句提示只说明 `GET /api/auth/login` 没答话。web 活着、api 不通——去看 api 容器日志，不要从 OIDC 配置查起 |
+| `cannot connect to postgres: ... dial tcp 172.17.0.1:5432: connect: connection timed out` | DSN 写成了 `host.docker.internal` = 宿主机，而枢纽 Postgres 在容器里且不发布端口。改成 `@postgres:5432` |
+| `password authentication failed for user "shortlink" (SQLSTATE 28P01)` | **角色不存在时报的也是这一条**（差别只在服务端日志的 `DETAIL`）。先 `SELECT rolname FROM pg_roles WHERE rolname='shortlink';` 确认它真的建了，再怀疑密码。密码含 `@ : / ? #` 时必须 percent-encode |
+| `db automigrate: permission denied for schema public` | 库不是 `shortlink` 拥有的 → `ALTER DATABASE kun_shortlink OWNER TO shortlink;` |
+| `auth initialization failed` + `oidc discovery: ...` | 容器出网/DNS 问题，不是 issuer 填错（issuer 不匹配会明说 `issuer mismatch`）|
+| 登录成功但停在首页「没有控制台权限」 | 账号的有效角色不在 `SHORTLINK_ADMIN_ROLES` 里。`/api/auth/me` 的 `roles` 就是判定依据 |
+
+prod 模式下 API 是**故意不容忍半残启动**的：上面每种情况都会打一条 ERROR 然后
+退出，容器进入 restart 循环，`docker logs` 第一屏就能看到是哪一种。
 
 ### GitHub secrets
 
