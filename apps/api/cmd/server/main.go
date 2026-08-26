@@ -57,6 +57,15 @@ func main() {
 	app := fiber.New(fiber.Config{
 		AppName:      "shortlink-api",
 		ServerHeader: "shortlink-api",
+		// fasthttp's default read buffer is 4 KiB, and the request line plus
+		// ALL headers must fit in it — anything larger is answered 431 before
+		// a handler runs. 4 KiB is not a realistic ceiling for a browser
+		// request: cookies are scoped by host and path but NOT by port, so
+		// every sibling NextMoe site sharing an origin sends its cookies
+		// here too (in dev they all sit on 127.0.0.1, including the IdP).
+		// 16 KiB matches the Node/Nitro proxy in front of this API, so the
+		// two tiers agree on what they accept.
+		ReadBufferSize: 16 * 1024,
 	})
 	// The redirect route registers BEFORE the Huma catch-all so /s/{alias}
 	// stays a plain Fiber 302 outside the JSON surface.
