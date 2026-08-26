@@ -7,9 +7,10 @@
 # lockfile + every workspace manifest. @kungal/ui-* comes from npm.
 #
 # Nitro route rules (the /api/** and /s/** proxy) are BAKED at build time from
-# SHORTLINK_API_PROXY_TARGET. The default targets the compose service name
-# `api` (docker/compose.dokploy.yml); override the build arg only when the
-# API is reachable under a different name.
+# SHORTLINK_API_PROXY_TARGET. The default targets `shortlink-api`, the API's
+# project-unique network alias in docker-compose.prod.yml — NOT the bare
+# service name: this container also joins the shared dokploy-network, where a
+# sibling project's `api` service would be an equally valid DNS answer.
 ARG NODE_VERSION=24
 
 FROM node:${NODE_VERSION}-trixie-slim AS base
@@ -27,7 +28,7 @@ RUN pnpm install --frozen-lockfile --ignore-scripts --filter "@shortlink/web..."
 
 # ---- build ----
 FROM deps AS build
-ARG API_PROXY_TARGET=http://api:7845
+ARG API_PROXY_TARGET=http://shortlink-api:7845
 ENV SHORTLINK_API_PROXY_TARGET=${API_PROXY_TARGET}
 COPY apps/web apps/web
 RUN pnpm --filter "@shortlink/web" run build

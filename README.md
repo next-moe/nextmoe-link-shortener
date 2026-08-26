@@ -88,9 +88,10 @@ web），只改文档的 push 一个镜像都不构建。Actions → Run workflo
 - `ghcr.io/next-moe/shortlink-api` — distroless，约 40 MB，`/s` 跳转 + API
 - `ghcr.io/next-moe/shortlink-web` — Nitro node-server，约 390 MB
 
-> web 镜像的代理目标（`/api/**`、`/s/**` → `http://api:7845`）是 **构建期烘进去的**
-> （Nitro route rules 在 `nuxt build` 时定死），所以它不是面板里的运行时变量；改动
-> 需要改 `build.yml` 的 `API_PROXY_TARGET` 并重建。compose 里 api 服务名必须保持 `api`。
+> web 镜像的代理目标（`/api/**`、`/s/**` → `http://shortlink-api:7845`）是
+> **构建期烘进去的**（Nitro route rules 在 `nuxt build` 时定死），所以它不是面板里的
+> 运行时变量；改动需要改 `build.yml` 的 `API_PROXY_TARGET` 并重建。对应
+> `docker-compose.prod.yml` 里 api 的网络别名 `shortlink-api`，这个别名必须保持稳定。
 > API 镜像相反：所有 `SHORTLINK_*` 都是启动时读环境变量，一个镜像跑任何环境。
 
 ## 部署（Dokploy）
@@ -108,8 +109,10 @@ web），只改文档的 push 一个镜像都不构建。Actions → Run workflo
 3. **GHCR 包可见性**：首次推送生成的 package 默认私有。要么在 GitHub →
    Packages → Package settings 改成 public，要么在 Dokploy 里配一个 registry
    凭据（用户名 = GitHub 账号，密码 = 带 `read:packages` 的 PAT）。
-4. Dokploy 新建 Compose 应用，内容参照 `docker/compose.dokploy.yml`；web 服务
-   （:3000）绑域名，api 不对外暴露。
+4. Dokploy 新建 Compose 应用，compose 文件用仓库根的 **`docker-compose.prod.yml`**：
+   web 绑域名（`expose: 3000`，Traefik 内部路由），api 和 redis 不对外暴露。
+   Postgres 不在这个文件里 —— DSN 是面板变量，指宿主机实例或另一个 Dokploy 应用
+   都行；表由 API 启动时 AutoMigrate 建，没有单独的 migrate 服务。
 
 ### Dokploy 面板要填的环境变量
 

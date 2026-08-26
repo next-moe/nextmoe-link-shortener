@@ -29,6 +29,7 @@ apps/api/tmp
 .idea
 .playwright-mcp
 docker/compose.dev.yml
+docker-compose.prod.yml
 scripts
 refs
 *.log

@@ -7,8 +7,8 @@
 #
 # The web image BAKES its proxy target at build time (Nitro route rules are
 # resolved during `nuxt build`), which is why API_PROXY_TARGET is a build-arg
-# here and not a runtime env in the panel. It points at the compose service name
-# `api` — keep that name stable in docker/compose.dokploy.yml.
+# here and not a runtime env in the panel. It points at `shortlink-api`, the
+# API's network alias in docker-compose.prod.yml — keep that alias stable.
 #
 # The API image needs no build args at all: every SHORTLINK_* value is read from
 # the environment at startup, so one image runs in any environment.
@@ -69,7 +69,7 @@ jobs:
           set -euo pipefail
           catalog='[
             {"name":"shortlink-api","file":"docker/api.Dockerfile","args":"","group":"api"},
-            {"name":"shortlink-web","file":"docker/web.Dockerfile","args":"API_PROXY_TARGET=http://api:7845","group":"web"}
+            {"name":"shortlink-web","file":"docker/web.Dockerfile","args":"API_PROXY_TARGET=http://shortlink-api:7845","group":"web"}
           ]'
           if [ "$EVENT" = "workflow_dispatch" ]; then
             if [ "$SCOPE" = "all" ]; then

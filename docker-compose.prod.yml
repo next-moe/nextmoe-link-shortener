@@ -1,0 +1,132 @@
+# nextmoe-link-shortener — PRODUCTION compose (Dokploy + GHCR prebuilt images).
+#
+# Differs from docker/compose.dev.yml (local backing services only):
+#   1. `image: ghcr.io/next-moe/shortlink-*` — NOT `build:`. CI builds and
+#      pushes (.github/workflows/build.yml); Dokploy PULLS.
+#   2. `expose:` (container network only), never `ports:` — Traefik routes to
+#      the web container from the Dokploy panel's domain settings.
+#   3. NO `env_file`: structural values are literal here, secrets and
+#      deploy-specifics come from Dokploy's Environment panel via ${VAR}.
+#      `${VAR:?msg}` means the deploy fails loudly instead of starting a broken
+#      container.
+#   4. Postgres is NOT in this file. Ecosystem convention is one Postgres per
+#      host with a database per domain, so the DSN is a panel value — it can
+#      point at the host instance (host.docker.internal, wired below) or at
+#      another Dokploy app's Postgres on dokploy-network. Create the database
+#      and role before the first deploy; the schema itself is GORM AutoMigrate
+#      at API startup, so there is no migrate job here.
+#
+# Set these in the Dokploy Environment panel:
+#   SHORTLINK_DB_DSN  SHORTLINK_PUBLIC_BASE_URL  SHORTLINK_OIDC_ISSUER
+#   SHORTLINK_OIDC_CLIENT_ID  SHORTLINK_OIDC_CLIENT_SECRET
+#   SHORTLINK_OIDC_REDIRECT_URI    (SHORTLINK_ADMIN_ROLES is optional)
+#
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
+name: nextmoe-link-shortener
+
+services:
+  # The only publicly routed container. Nitro serves the dashboard and proxies
+  # /api/** and /s/** to the API, so browsers, dashboard admins and short-link
+  # visitors all enter through one origin (zero CORS, first-party session
+  # cookie).
+  web:
+    image: ghcr.io/next-moe/shortlink-web:latest
+    pull_policy: always            # :latest moves under us on every deploy
+    restart: unless-stopped
+    depends_on:
+      - api
+    expose:
+      - '3000'
+    # No shell in the runtime image beyond node itself, so probe the port from
+    # node rather than with curl/wget.
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "require('node:net').connect(3000,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - internal
+      - dokploy-network
+
+  # OIDC RP + BFF + short-link redirect. Reached by web over `internal`; not
+  # published, so the only public path to it is through web's proxy.
+  api:
+    image: ghcr.io/next-moe/shortlink-api:latest
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      SHORTLINK_MODE: prod
+      SHORTLINK_HOST: 0.0.0.0
+      SHORTLINK_PORT: '7845'
+      # Panel values. `:?` so a missing one stops the deploy here, with the
+      # message, instead of crash-looping the container.
+      SHORTLINK_DB_DSN: ${SHORTLINK_DB_DSN:?postgres DSN, e.g. postgres://shortlink:PASSWORD@host.docker.internal:5432/kun_shortlink?sslmode=disable}
+      SHORTLINK_PUBLIC_BASE_URL: ${SHORTLINK_PUBLIC_BASE_URL:?public origin short links are built from, e.g. https://s.kungal.com}
+      SHORTLINK_OIDC_ISSUER: ${SHORTLINK_OIDC_ISSUER:?NextMoe IdP root; endpoints come from discovery}
+      SHORTLINK_OIDC_CLIENT_ID: ${SHORTLINK_OIDC_CLIENT_ID:?set SHORTLINK_OIDC_CLIENT_ID}
+      SHORTLINK_OIDC_CLIENT_SECRET: ${SHORTLINK_OIDC_CLIENT_SECRET:?set SHORTLINK_OIDC_CLIENT_SECRET}
+      SHORTLINK_OIDC_REDIRECT_URI: ${SHORTLINK_OIDC_REDIRECT_URI:?must equal the URI registered at the IdP, e.g. https://s.kungal.com/auth/callback}
+      SHORTLINK_ADMIN_ROLES: ${SHORTLINK_ADMIN_ROLES:-admin}
+      # Project-unique alias, not plain `redis` — see the networks note below.
+      SHORTLINK_REDIS_ADDR: shortlink-redis:6379
+    # Lets SHORTLINK_DB_DSN address the host's own Postgres. Harmless when the
+    # DSN points somewhere else.
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    depends_on:
+      redis:
+        condition: service_healthy
+    # No healthcheck: the image is distroless/static with no shell and no
+    # busybox, and the binary has no self-probe flag, so there is nothing to
+    # run inside it. `web` therefore waits only for start, not for health.
+    networks:
+      internal:
+        aliases:
+          - shortlink-api
+      # Also on the shared network so a sibling product deployed on this host
+      # can call the S2S API internally at http://shortlink-api:7845 instead of
+      # going out and back through the public origin. The alias hangs on the
+      # `dokploy-network` KEY rather than `default` on purpose: Dokploy rewrites
+      # this file at deploy time and appends `dokploy-network: {}` to each
+      # service, which would drop an alias declared under `default` (infra hit
+      # exactly this).
+      dokploy-network:
+        aliases:
+          - shortlink-api
+
+  # BFF sessions only (the OIDC tokens live here, never in the browser).
+  # Losing this volume logs every admin out; it holds nothing else.
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--save', '60', '1', '--appendonly', 'no']
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # Private network only, and under a project-unique alias: every project on
+    # dokploy-network that ships a service called `redis` would otherwise be a
+    # candidate for that name, and Docker DNS would happily hand us someone
+    # else's cache.
+    networks:
+      internal:
+        aliases:
+          - shortlink-redis
+
+volumes:
+  redis:
+
+networks:
+  # Created by Dokploy; Traefik lives here.
+  dokploy-network:
+    external: true
+  internal:
