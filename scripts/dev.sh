@@ -21,6 +21,37 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
+# Reclaim the app ports before starting. A previous run can leave a listener
+# behind — SIGKILL skips the graceful shutdown, and any process killed while
+# holding the socket keeps it — and the next start then dies with
+# "address already in use". Only 7844/7845 are touched; Postgres and Redis
+# live in Docker and are managed by compose.
+reclaim_port() {
+  local port="$1" label="$2" pids pid
+  pids="$(ss -tlnpH "sport = :$port" 2>/dev/null | grep -oP 'pid=\K[0-9]+' | sort -u || true)"
+  [[ -n "$pids" ]] || return 0
+
+  for pid in $pids; do
+    echo "port $port ($label) is held by pid $pid — $(ps -o args= -p "$pid" 2>/dev/null | cut -c1-80)"
+    kill -TERM "$pid" 2>/dev/null || true
+  done
+
+  # Give the graceful path a moment, then insist.
+  for _ in $(seq 1 20); do
+    ss -tlnH "sport = :$port" 2>/dev/null | grep -q . || return 0
+    sleep 0.25
+  done
+  for pid in $pids; do
+    kill -KILL "$pid" 2>/dev/null || true
+  done
+  sleep 0.5
+}
+
+if command -v ss >/dev/null 2>&1; then
+  reclaim_port 7845 api
+  reclaim_port 7844 web
+fi
+
 echo "starting backing services (Postgres :7846, Redis :7847)..."
 docker compose --env-file .env -f docker/compose.dev.yml up -d --wait
 

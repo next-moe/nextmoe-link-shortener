@@ -2,7 +2,7 @@
   "name": "@shortlink/api",
   "private": true,
   "scripts": {
-    "dev": "go run ./cmd/server",
+    "dev": "go build -o ./build/server ./cmd/server && exec ./build/server",
     "build": "go build -o ./build/server ./cmd/server",
     "test": "go test ./...",
     "lint": "go vet ./...",

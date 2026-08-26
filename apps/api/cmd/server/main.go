@@ -161,8 +161,12 @@ func buildAuth(ctx context.Context, cfg config.Config, rdb *redis.Client) (auth.
 // run serves until an interrupt/termination signal, then shuts down
 // gracefully. A bind failure returns immediately rather than leaving a
 // process that is alive but not serving.
+//
+// SIGHUP is in the set because a closed terminal must release the listening
+// socket: Go's default action for it is to die on the spot, which skips the
+// graceful drain below.
 func run(app *fiber.App, cfg config.Config) error {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 	defer stop()
 
 	addr := fmt.Sprintf("%s:%s", cfg.Host, cfg.Port)
