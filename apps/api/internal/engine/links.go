@@ -2,6 +2,7 @@ package engine
 
 import (
 	"errors"
+	"sort"
 	"time"
 
 	"gorm.io/gorm"
@@ -177,16 +178,18 @@ type Stats struct {
 	Link           model.ShortLink
 	RangeDays      int
 	UniqueVisitors int64
+	RangeVisits    int64
+	RangeUnique    int64
 	Buckets        []model.ShortLinkVisitBucket
 	Recent         []model.ShortLinkVisit
+	Referrers      []OverviewReferrer
 }
 
-// LinkStats aggregates the stats panel data: hourly buckets over the range,
-// the 10 most recent visits, and the all-time distinct-IP count.
+// LinkStats aggregates the detail panel's data: hourly buckets over the range,
+// the range totals, the referrer breakdown, the most recent visits, and the
+// all-time distinct-IP count.
 func (e *Engine) LinkStats(alias string, rangeDays int) (*Stats, error) {
-	if rangeDays < 1 || rangeDays > 30 {
-		rangeDays = 7
-	}
+	rangeDays = clampRange(rangeDays)
 	link, err := e.GetLinkByAlias(alias)
 	if err != nil {
 		return nil, err
@@ -202,7 +205,7 @@ func (e *Engine) LinkStats(alias string, rangeDays int) (*Stats, error) {
 	var recent []model.ShortLinkVisit
 	if err := e.db.
 		Where("short_link_id = ?", link.ID).
-		Order("id DESC").Limit(10).Find(&recent).Error; err != nil {
+		Order("id DESC").Limit(recentVisitLimit).Find(&recent).Error; err != nil {
 		return nil, err
 	}
 	var uniqueVisitors int64
@@ -211,11 +214,61 @@ func (e *Engine) LinkStats(alias string, rangeDays int) (*Stats, error) {
 		Distinct("ip").Count(&uniqueVisitors).Error; err != nil {
 		return nil, err
 	}
-	return &Stats{
+	referrers, err := e.linkReferrers(link.ID, rangeStart)
+	if err != nil {
+		return nil, err
+	}
+
+	stats := &Stats{
 		Link:           *link,
 		RangeDays:      rangeDays,
 		UniqueVisitors: uniqueVisitors,
 		Buckets:        buckets,
 		Recent:         recent,
-	}, nil
+		Referrers:      referrers,
+	}
+	for _, b := range buckets {
+		stats.RangeVisits += b.Visits
+		stats.RangeUnique += b.UniqueIPs
+	}
+	return stats, nil
+}
+
+// recentVisitLimit sizes the detail panel's activity feed.
+const recentVisitLimit = 12
+
+// linkReferrers is referrerBreakdown scoped to a single link.
+func (e *Engine) linkReferrers(linkID int64, rangeStart time.Time) ([]OverviewReferrer, error) {
+	var rows []struct {
+		Referer string
+		Visits  int64
+	}
+	if err := e.db.Model(&model.ShortLinkVisit{}).
+		Select("referer, count(*) as visits").
+		Where("short_link_id = ? AND created_at >= ?", linkID, rangeStart).
+		Group("referer").Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	byHost := map[string]int64{}
+	for _, r := range rows {
+		byHost[refererHost(r.Referer)] += r.Visits
+	}
+	out := make([]OverviewReferrer, 0, len(byHost))
+	for host, visits := range byHost {
+		out = append(out, OverviewReferrer{Host: host, Visits: visits})
+	}
+	sort.Slice(out, func(a, b int) bool {
+		if out[a].Visits != out[b].Visits {
+			return out[a].Visits > out[b].Visits
+		}
+		return out[a].Host < out[b].Host
+	})
+	if len(out) > referrerLimit {
+		var rest int64
+		for _, r := range out[referrerLimit:] {
+			rest += r.Visits
+		}
+		out = append(out[:referrerLimit:referrerLimit], OverviewReferrer{Host: "", Visits: rest})
+	}
+	return out, nil
 }

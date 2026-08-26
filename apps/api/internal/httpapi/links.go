@@ -162,12 +162,24 @@ type VisitDTO struct {
 
 type linkStatsOutput struct {
 	Body struct {
-		Link           LinkDTO     `json:"link"`
-		RangeDays      int         `json:"range_days"`
-		UniqueVisitors int64       `json:"unique_visitors" doc:"all-time distinct IPs"`
-		Buckets        []BucketDTO `json:"buckets"`
-		Recent         []VisitDTO  `json:"recent"`
+		Link           LinkDTO       `json:"link"`
+		RangeDays      int           `json:"range_days"`
+		UniqueVisitors int64         `json:"unique_visitors" doc:"all-time distinct IPs"`
+		RangeVisits    int64         `json:"range_visits"`
+		RangeUnique    int64         `json:"range_unique"`
+		Buckets        []BucketDTO   `json:"buckets"`
+		Recent         []VisitDTO    `json:"recent"`
+		Referrers      []ReferrerDTO `json:"referrers"`
 	}
+}
+
+// toReferrerDTOs maps the engine's referrer rollup onto the wire shape.
+func toReferrerDTOs(rows []engine.OverviewReferrer) []ReferrerDTO {
+	out := make([]ReferrerDTO, len(rows))
+	for i, r := range rows {
+		out[i] = ReferrerDTO{Host: r.Host, Visits: r.Visits}
+	}
+	return out
 }
 
 func (h *handlers) linkStats(ctx context.Context, in *linkStatsInput) (*linkStatsOutput, error) {
@@ -182,6 +194,9 @@ func (h *handlers) linkStats(ctx context.Context, in *linkStatsInput) (*linkStat
 	out.Body.Link = h.toLinkDTO(&stats.Link)
 	out.Body.RangeDays = stats.RangeDays
 	out.Body.UniqueVisitors = stats.UniqueVisitors
+	out.Body.RangeVisits = stats.RangeVisits
+	out.Body.RangeUnique = stats.RangeUnique
+	out.Body.Referrers = toReferrerDTOs(stats.Referrers)
 	out.Body.Buckets = make([]BucketDTO, len(stats.Buckets))
 	for i, b := range stats.Buckets {
 		out.Body.Buckets[i] = BucketDTO{BucketStart: b.BucketStart, Visits: b.Visits, UniqueIPs: b.UniqueIPs}

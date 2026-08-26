@@ -409,9 +409,21 @@ components:
         range_days:
           format: int64
           type: integer
+        range_unique:
+          format: int64
+          type: integer
+        range_visits:
+          format: int64
+          type: integer
         recent:
           items:
             $ref: "#/components/schemas/VisitDTO"
+          type:
+            - array
+            - "null"
+        referrers:
+          items:
+            $ref: "#/components/schemas/ReferrerDTO"
           type:
             - array
             - "null"
@@ -423,8 +435,11 @@ components:
         - link
         - range_days
         - unique_visitors
+        - range_visits
+        - range_unique
         - buckets
         - recent
+        - referrers
       type: object
     MeOutputBody:
       additionalProperties: false
@@ -469,6 +484,154 @@ components:
           type: boolean
       required:
         - ok
+      type: object
+    OverviewLinkDTO:
+      additionalProperties: false
+      properties:
+        link:
+          $ref: "#/components/schemas/LinkDTO"
+        range_unique:
+          format: int64
+          type: integer
+        range_visits:
+          format: int64
+          type: integer
+      required:
+        - link
+        - range_visits
+        - range_unique
+      type: object
+    OverviewOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/OverviewOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        links:
+          items:
+            $ref: "#/components/schemas/OverviewLinkDTO"
+          type:
+            - array
+            - "null"
+        range_days:
+          format: int64
+          type: integer
+        range_start:
+          format: date-time
+          type: string
+        referrers:
+          items:
+            $ref: "#/components/schemas/ReferrerDTO"
+          type:
+            - array
+            - "null"
+        series:
+          description: hourly buckets summed across links; sparse (empty hours are omitted)
+          items:
+            $ref: "#/components/schemas/BucketDTO"
+          type:
+            - array
+            - "null"
+        sources:
+          items:
+            $ref: "#/components/schemas/OverviewSourceDTO"
+          type:
+            - array
+            - "null"
+        totals:
+          $ref: "#/components/schemas/OverviewTotalsDTO"
+      required:
+        - range_days
+        - range_start
+        - totals
+        - series
+        - links
+        - sources
+        - referrers
+      type: object
+    OverviewSourceDTO:
+      additionalProperties: false
+      properties:
+        created_via:
+          type: string
+        links:
+          format: int64
+          type: integer
+        range_visits:
+          format: int64
+          type: integer
+      required:
+        - created_via
+        - links
+        - range_visits
+      type: object
+    OverviewTotalsDTO:
+      additionalProperties: false
+      properties:
+        active_keys:
+          format: int64
+          type: integer
+        active_links:
+          format: int64
+          type: integer
+        all_time_visits:
+          format: int64
+          type: integer
+        archived_links:
+          format: int64
+          type: integer
+        disabled_links:
+          format: int64
+          type: integer
+        keys:
+          format: int64
+          type: integer
+        links:
+          format: int64
+          type: integer
+        prev_unique:
+          description: unique IPs in the preceding window of equal length
+          format: int64
+          type: integer
+        prev_visits:
+          description: visits in the preceding window of equal length
+          format: int64
+          type: integer
+        range_unique:
+          format: int64
+          type: integer
+        range_visits:
+          format: int64
+          type: integer
+      required:
+        - links
+        - active_links
+        - disabled_links
+        - archived_links
+        - all_time_visits
+        - range_visits
+        - range_unique
+        - prev_visits
+        - prev_unique
+        - keys
+        - active_keys
+      type: object
+    ReferrerDTO:
+      additionalProperties: false
+      properties:
+        host:
+          description: referrer host, "" for direct traffic
+          type: string
+        visits:
+          format: int64
+          type: integer
+      required:
+        - host
+        - visits
       type: object
     S2sCreateLinkInputBody:
       additionalProperties: false
@@ -1076,3 +1239,31 @@ paths:
       summary: Look up a short link by alias
       tags:
         - s2s
+  /stats/overview:
+    get:
+      operationId: stats-overview
+      parameters:
+        - description: days covered by the window (1-30, default 7)
+          explode: false
+          in: query
+          name: range
+          schema:
+            description: days covered by the window (1-30, default 7)
+            format: int64
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OverviewOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Dashboard aggregates (totals, traffic series, per-link and referrer breakdowns)
+      tags:
+        - stats

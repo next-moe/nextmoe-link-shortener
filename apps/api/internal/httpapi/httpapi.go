@@ -64,6 +64,7 @@ func NewAPI(app *fiber.App, deps Deps) huma.API {
 	}
 	h.registerAuth(api)
 	h.registerLinks(api)
+	h.registerOverview(api)
 	h.registerKeys(api)
 	h.registerS2S(api)
 	return api
