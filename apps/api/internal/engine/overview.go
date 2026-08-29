@@ -30,13 +30,6 @@ type OverviewTotals struct {
 	ActiveKeys    int64
 }
 
-// OverviewLink pairs a link with its in-range visit aggregates.
-type OverviewLink struct {
-	Link        model.ShortLink
-	RangeVisits int64
-	RangeUnique int64
-}
-
 // OverviewSource is the per-origin rollup ("dashboard" vs each S2S key name).
 type OverviewSource struct {
 	CreatedVia  string
@@ -52,8 +45,10 @@ type OverviewReferrer struct {
 	Visits int64
 }
 
-// Overview is the dashboard's read model: every number the console renders in
-// one round trip.
+// Overview is the dashboard's read model: every AGGREGATE the console renders,
+// in one round trip. The link inventory itself is not here — it is paged
+// separately (ListLinks), because it is the one part of this page that grows
+// without bound.
 //
 // Series carries the summed hourly buckets, sparse (only hours with traffic).
 // Rolling them up to days is deliberately left to the client so the axis lands
@@ -63,7 +58,6 @@ type Overview struct {
 	RangeStart time.Time
 	Totals     OverviewTotals
 	Series     []Bucket
-	Links      []OverviewLink
 	Sources    []OverviewSource
 	Referrers  []OverviewReferrer
 }
@@ -150,59 +144,63 @@ func (e *Engine) Overview(rangeDays int) (*Overview, error) {
 		return nil, err
 	}
 
-	// ---- per-link range aggregates ----
-	var perLink []struct {
-		ShortLinkID int64
-		Visits      int64
-		UniqueIPs   int64
-	}
-	if err := e.db.Model(&model.ShortLinkVisitBucket{}).
-		Select("short_link_id, sum(visits) as visits, sum(unique_ips) as unique_ips").
-		Where("bucket_start >= ?", rangeStart).
-		Group("short_link_id").Scan(&perLink).Error; err != nil {
-		return nil, err
-	}
-	rangeByLink := make(map[int64]struct{ Visits, Unique int64 }, len(perLink))
-	for _, r := range perLink {
-		rangeByLink[r.ShortLinkID] = struct{ Visits, Unique int64 }{r.Visits, r.UniqueIPs}
-	}
-
-	links, err := e.ListLinks()
+	out.Sources, err = e.sourceBreakdown(rangeStart)
 	if err != nil {
 		return nil, err
 	}
-	out.Links = make([]OverviewLink, len(links))
-	sources := map[string]*OverviewSource{}
-	for i := range links {
-		agg := rangeByLink[links[i].ID]
-		out.Links[i] = OverviewLink{Link: links[i], RangeVisits: agg.Visits, RangeUnique: agg.Unique}
-
-		via := links[i].CreatedVia
-		if via == "" {
-			via = "unknown"
-		}
-		if sources[via] == nil {
-			sources[via] = &OverviewSource{CreatedVia: via}
-		}
-		sources[via].Links++
-		sources[via].RangeVisits += agg.Visits
-	}
-	out.Sources = make([]OverviewSource, 0, len(sources))
-	for _, s := range sources {
-		out.Sources = append(out.Sources, *s)
-	}
-	// Busiest source first, then by name so equal rows keep a stable order.
-	sort.Slice(out.Sources, func(a, b int) bool {
-		if out.Sources[a].RangeVisits != out.Sources[b].RangeVisits {
-			return out.Sources[a].RangeVisits > out.Sources[b].RangeVisits
-		}
-		return out.Sources[a].CreatedVia < out.Sources[b].CreatedVia
-	})
 
 	out.Referrers, err = e.referrerBreakdown(rangeStart)
 	if err != nil {
 		return nil, err
 	}
+	return out, nil
+}
+
+// sourceBreakdown rolls every link up by the product that minted it.
+//
+// It groups in SQL over the WHOLE table on purpose. This used to be folded in
+// Go from the link list the dashboard was about to render, which quietly made
+// the card a rollup of the newest N links rather than of the service — the
+// totals beside it counted every link, so the two disagreed with no way to
+// tell which was wrong.
+func (e *Engine) sourceBreakdown(rangeStart time.Time) ([]OverviewSource, error) {
+	var rows []struct {
+		CreatedVia  string
+		Links       int64
+		RangeVisits int64
+	}
+	if err := e.db.Table("short_link AS sl").
+		Joins("LEFT JOIN (?) AS b ON b.short_link_id = sl.id", e.rangeAggregates(rangeStart)).
+		Select("sl.created_via AS created_via, count(*) AS links, coalesce(sum(b.visits), 0) AS range_visits").
+		Group("sl.created_via").Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	// Links minted before created_via existed carry "", which reads as one
+	// source rather than a blank row.
+	byVia := map[string]*OverviewSource{}
+	for _, r := range rows {
+		via := r.CreatedVia
+		if via == "" {
+			via = "unknown"
+		}
+		if byVia[via] == nil {
+			byVia[via] = &OverviewSource{CreatedVia: via}
+		}
+		byVia[via].Links += r.Links
+		byVia[via].RangeVisits += r.RangeVisits
+	}
+	out := make([]OverviewSource, 0, len(byVia))
+	for _, s := range byVia {
+		out = append(out, *s)
+	}
+	// Busiest source first, then by name so equal rows keep a stable order.
+	sort.Slice(out, func(a, b int) bool {
+		if out[a].RangeVisits != out[b].RangeVisits {
+			return out[a].RangeVisits > out[b].RangeVisits
+		}
+		return out[a].CreatedVia < out[b].CreatedVia
+	})
 	return out, nil
 }
 

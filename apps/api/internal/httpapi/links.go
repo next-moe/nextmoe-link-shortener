@@ -20,7 +20,8 @@ func (h *handlers) registerLinks(api huma.API) {
 		OperationID: "list-links",
 		Method:      http.MethodGet,
 		Path:        "/links",
-		Summary:     "List short links (newest first)",
+		Summary:     "List short links (one page, filtered and sorted server-side)",
+		Description: "Returns one page of the link inventory, each row carrying its visit aggregates for the requested window, plus the total the filters match. Search, status and sort all resolve in the database: the inventory grows without bound, so a client that filtered its own page would only ever search the rows it happened to be holding.",
 		Tags:        []string{"links"},
 	}, h.listLinks)
 
@@ -60,26 +61,65 @@ func (h *handlers) registerLinks(api huma.API) {
 
 // ---- list ----
 
+type linkListInput struct {
+	Page    int    `query:"page" minimum:"1" default:"1"`
+	PerPage int    `query:"per_page" minimum:"1" maximum:"100" default:"20" doc:"rows per page (1-100)"`
+	Query   string `query:"q" maxLength:"200" doc:"case-insensitive substring of the alias, destination or description"`
+	Status  int    `query:"status" minimum:"-1" maximum:"2" default:"-1" doc:"0=active 1=disabled 2=archived, -1=any"`
+	Sort    string `query:"sort" enum:"range,total,created,alias" default:"range" doc:"range=in-window visits, total=all-time visits, created=newest first, alias=A-Z"`
+	Range   int    `query:"range" minimum:"1" maximum:"30" default:"7" doc:"days the per-row visit aggregates cover"`
+}
+
+// LinkRowDTO is one inventory row: the link plus its aggregates for the
+// requested window.
+type LinkRowDTO struct {
+	Link        LinkDTO `json:"link"`
+	RangeVisits int64   `json:"range_visits"`
+	RangeUnique int64   `json:"range_unique"`
+}
+
 type linkListOutput struct {
 	Body struct {
-		Links []LinkDTO `json:"links"`
+		Links      []LinkRowDTO `json:"links"`
+		Total      int64        `json:"total" doc:"rows matching the filters, across every page"`
+		Page       int          `json:"page"`
+		PerPage    int          `json:"per_page"`
+		TotalPages int          `json:"total_pages" doc:"at least 1, so an empty inventory still reads as page 1 of 1"`
+		RangeDays  int          `json:"range_days"`
 	}
 }
 
-func (h *handlers) listLinks(ctx context.Context, _ *struct{}) (*linkListOutput, error) {
+func (h *handlers) listLinks(ctx context.Context, in *linkListInput) (*linkListOutput, error) {
 	if _, err := h.requireAdmin(ctx); err != nil {
 		return nil, err
 	}
-	links, err := h.engine.ListLinks()
+	page, err := h.engine.ListLinks(engine.ListLinksParams{
+		Query:     in.Query,
+		Status:    int16(in.Status),
+		Sort:      in.Sort,
+		Page:      in.Page,
+		PerPage:   in.PerPage,
+		RangeDays: in.Range,
+	})
 	if err != nil {
 		slog.Error("list links", "error", err)
 		return nil, huma.Error500InternalServerError("could not list links")
 	}
+
 	out := &linkListOutput{}
-	out.Body.Links = make([]LinkDTO, len(links))
-	for i := range links {
-		out.Body.Links[i] = h.toLinkDTO(&links[i])
+	out.Body.Links = make([]LinkRowDTO, len(page.Rows))
+	for i := range page.Rows {
+		out.Body.Links[i] = LinkRowDTO{
+			Link:        h.toLinkDTO(&page.Rows[i].Link),
+			RangeVisits: page.Rows[i].RangeVisits,
+			RangeUnique: page.Rows[i].RangeUnique,
+		}
 	}
+	out.Body.Total = page.Total
+	out.Body.Page = page.Page
+	out.Body.PerPage = page.PerPage
+	out.Body.TotalPages = page.TotalPages()
+	out.Body.RangeDays = page.RangeDays
 	return out, nil
 }
 

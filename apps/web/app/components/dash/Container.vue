@@ -5,13 +5,42 @@
 // breakdowns → table — with no ragged side column. The previous version put a
 // short stats panel beside a long list, so the panel stretched to the list's
 // height and left a screen-tall hole in the middle of the page.
-import type { LinkDTO, OverviewLinkDTO } from '~~/shared/types/shortlink'
+//
+// Two loaders, one range. The aggregates come in a single call; the link
+// inventory pages separately, because it is the one part of this page that
+// grows without bound. This component owns the range control, so it is the
+// component that reloads both when the window changes — and after any mutation,
+// since a create or delete moves the totals AND the page under the reader.
+import type { LinkDTO, LinkRowDTO } from '~~/shared/types/shortlink'
 
-const { range, data, pending, error, load, setRange, granularity, points } =
-  useOverview()
+const { range, data, pending, error, load, granularity, points } = useOverview()
+const {
+  load: loadLinks,
+  page: linksPage,
+  pending: linksPending
+} = useLinks()
 const { deleteLink } = useApi()
 
-onMounted(load)
+// Both fetches go out together rather than in sequence: neither depends on the
+// other's answer, and the console is only whole once both have landed.
+const reload = () => Promise.all([load(), loadLinks()])
+
+// The refresh control speaks for both fetches — it spins until the slower one
+// lands, so it never goes idle while half the page is still in flight.
+const refreshing = computed(() => pending.value || linksPending.value)
+
+onMounted(reload)
+
+const setRange = async (days: number) => {
+  if (days === range.value) {
+    return
+  }
+  range.value = days
+  // The row aggregates are scoped to the window too, so the open page is about
+  // to be re-ranked — start the reader at the top of the new ordering.
+  linksPage.value = 1
+  await reload()
+}
 
 const showCreate = ref(false)
 const showEdit = ref(false)
@@ -89,7 +118,7 @@ const referrerRows = computed(() =>
   }))
 )
 
-const openDrawer = (row: OverviewLinkDTO) => {
+const openDrawer = (row: LinkRowDTO) => {
   selected.value = row.link
   showDrawer.value = true
 }
@@ -117,7 +146,7 @@ const confirmDelete = async () => {
     if (selected.value?.id === deleting.value.id) {
       showDrawer.value = false
     }
-    await load()
+    await reload()
   } catch {
     useKunMessage('删除失败，请重试', 'error')
   } finally {
@@ -125,19 +154,21 @@ const confirmDelete = async () => {
   }
 }
 
-const handleSaved = async () => {
+const handleSaved = async (link: LinkDTO) => {
   showEdit.value = false
-  await load()
-  // Keep the open drawer in sync with what was just saved.
-  if (selected.value) {
-    selected.value =
-      data.value?.links.find((l) => l.link.id === selected.value?.id)?.link ??
-      selected.value
+  await reload()
+  // Keep the open drawer in sync with what was just saved. The saved link is
+  // taken from the response rather than looked up in the table: an edit can
+  // move a row onto a page this one is no longer showing.
+  if (selected.value?.id === link.id) {
+    selected.value = link
   }
 }
 
 const handleCreated = async (link: LinkDTO) => {
-  await load()
+  // A new link is the newest row, which the default ordering puts on page 1.
+  linksPage.value = 1
+  await reload()
   selected.value = link
   showDrawer.value = true
 }
@@ -175,8 +206,8 @@ const handleCreated = async (link: LinkDTO) => {
             size="sm"
             is-icon-only
             aria-label="刷新数据"
-            :loading="pending"
-            @click="load"
+            :loading="refreshing"
+            @click="reload"
           >
             <KunIcon name="lucide:refresh-ccw" />
           </KunButton>
@@ -273,8 +304,7 @@ const handleCreated = async (link: LinkDTO) => {
       </section>
 
       <DashLinkTable
-        :rows="data?.links ?? []"
-        :pending="pending"
+        :total-links="totals.links"
         :range-label="rangeLabel"
         @create="showCreate = true"
         @select="openDrawer"

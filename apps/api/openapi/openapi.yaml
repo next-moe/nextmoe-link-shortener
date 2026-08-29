@@ -454,12 +454,50 @@ components:
           type: string
         links:
           items:
-            $ref: "#/components/schemas/LinkDTO"
+            $ref: "#/components/schemas/LinkRowDTO"
           type:
             - array
             - "null"
+        page:
+          format: int64
+          type: integer
+        per_page:
+          format: int64
+          type: integer
+        range_days:
+          format: int64
+          type: integer
+        total:
+          description: rows matching the filters, across every page
+          format: int64
+          type: integer
+        total_pages:
+          description: at least 1, so an empty inventory still reads as page 1 of 1
+          format: int64
+          type: integer
       required:
         - links
+        - total
+        - page
+        - per_page
+        - total_pages
+        - range_days
+      type: object
+    LinkRowDTO:
+      additionalProperties: false
+      properties:
+        link:
+          $ref: "#/components/schemas/LinkDTO"
+        range_unique:
+          format: int64
+          type: integer
+        range_visits:
+          format: int64
+          type: integer
+      required:
+        - link
+        - range_visits
+        - range_unique
       type: object
     LinkStatsOutputBody:
       additionalProperties: false
@@ -558,22 +596,6 @@ components:
       required:
         - ok
       type: object
-    OverviewLinkDTO:
-      additionalProperties: false
-      properties:
-        link:
-          $ref: "#/components/schemas/LinkDTO"
-        range_unique:
-          format: int64
-          type: integer
-        range_visits:
-          format: int64
-          type: integer
-      required:
-        - link
-        - range_visits
-        - range_unique
-      type: object
     OverviewOutputBody:
       additionalProperties: false
       properties:
@@ -584,12 +606,6 @@ components:
           format: uri
           readOnly: true
           type: string
-        links:
-          items:
-            $ref: "#/components/schemas/OverviewLinkDTO"
-          type:
-            - array
-            - "null"
         range_days:
           format: int64
           type: integer
@@ -622,7 +638,6 @@ components:
         - range_start
         - totals
         - series
-        - links
         - sources
         - referrers
       type: object
@@ -1117,7 +1132,71 @@ paths:
         - keys
   /links:
     get:
+      description: "Returns one page of the link inventory, each row carrying its visit aggregates for the requested window, plus the total the filters match. Search, status and sort all resolve in the database: the inventory grows without bound, so a client that filtered its own page would only ever search the rows it happened to be holding."
       operationId: list-links
+      parameters:
+        - explode: false
+          in: query
+          name: page
+          schema:
+            default: 1
+            format: int64
+            minimum: 1
+            type: integer
+        - description: rows per page (1-100)
+          explode: false
+          in: query
+          name: per_page
+          schema:
+            default: 20
+            description: rows per page (1-100)
+            format: int64
+            maximum: 100
+            minimum: 1
+            type: integer
+        - description: case-insensitive substring of the alias, destination or description
+          explode: false
+          in: query
+          name: q
+          schema:
+            description: case-insensitive substring of the alias, destination or description
+            maxLength: 200
+            type: string
+        - description: 0=active 1=disabled 2=archived, -1=any
+          explode: false
+          in: query
+          name: status
+          schema:
+            default: -1
+            description: 0=active 1=disabled 2=archived, -1=any
+            format: int64
+            maximum: 2
+            minimum: -1
+            type: integer
+        - description: range=in-window visits, total=all-time visits, created=newest first, alias=A-Z
+          explode: false
+          in: query
+          name: sort
+          schema:
+            default: range
+            description: range=in-window visits, total=all-time visits, created=newest first, alias=A-Z
+            enum:
+              - range
+              - total
+              - created
+              - alias
+            type: string
+        - description: days the per-row visit aggregates cover
+          explode: false
+          in: query
+          name: range
+          schema:
+            default: 7
+            description: days the per-row visit aggregates cover
+            format: int64
+            maximum: 30
+            minimum: 1
+            type: integer
       responses:
         "200":
           content:
@@ -1131,7 +1210,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List short links (newest first)
+      summary: List short links (one page, filtered and sorted server-side)
       tags:
         - links
     post:
@@ -1372,6 +1451,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Dashboard aggregates (totals, traffic series, per-link and referrer breakdowns)
+      summary: Dashboard aggregates (totals, traffic series, source and referrer breakdowns)
       tags:
         - stats

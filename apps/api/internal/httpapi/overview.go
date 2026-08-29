@@ -10,14 +10,17 @@ import (
 )
 
 // registerOverview wires the dashboard's aggregate read model. It is one
-// admin-gated call that answers every number the console renders, so the
-// dashboard does not fan out one request per link.
+// admin-gated call that answers every AGGREGATE the console renders, so the
+// dashboard does not fan out one request per link. The inventory itself is
+// paged separately (GET /links) — it is the one part of the page that grows
+// without bound, and shipping it inside this payload capped what the console
+// could ever see.
 func (h *handlers) registerOverview(api huma.API) {
 	huma.Register(api, huma.Operation{
 		OperationID: "stats-overview",
 		Method:      http.MethodGet,
 		Path:        "/stats/overview",
-		Summary:     "Dashboard aggregates (totals, traffic series, per-link and referrer breakdowns)",
+		Summary:     "Dashboard aggregates (totals, traffic series, source and referrer breakdowns)",
 		Tags:        []string{"stats"},
 	}, h.statsOverview)
 }
@@ -43,13 +46,6 @@ type OverviewTotalsDTO struct {
 	ActiveKeys    int64 `json:"active_keys"`
 }
 
-// OverviewLinkDTO is a link plus its in-range aggregates.
-type OverviewLinkDTO struct {
-	Link        LinkDTO `json:"link"`
-	RangeVisits int64   `json:"range_visits"`
-	RangeUnique int64   `json:"range_unique"`
-}
-
 // OverviewSourceDTO rolls links up by origin ("dashboard" or an S2S key name).
 type OverviewSourceDTO struct {
 	CreatedVia  string `json:"created_via"`
@@ -70,7 +66,6 @@ type overviewOutput struct {
 		RangeStart time.Time           `json:"range_start"`
 		Totals     OverviewTotalsDTO   `json:"totals"`
 		Series     []BucketDTO         `json:"series" doc:"hourly buckets summed across links; sparse (empty hours are omitted)"`
-		Links      []OverviewLinkDTO   `json:"links"`
 		Sources    []OverviewSourceDTO `json:"sources"`
 		Referrers  []ReferrerDTO       `json:"referrers"`
 	}
@@ -105,14 +100,6 @@ func (h *handlers) statsOverview(ctx context.Context, in *overviewInput) (*overv
 	out.Body.Series = make([]BucketDTO, len(ov.Series))
 	for i, b := range ov.Series {
 		out.Body.Series[i] = BucketDTO{BucketStart: b.BucketStart, Visits: b.Visits, UniqueIPs: b.UniqueIPs}
-	}
-	out.Body.Links = make([]OverviewLinkDTO, len(ov.Links))
-	for i := range ov.Links {
-		out.Body.Links[i] = OverviewLinkDTO{
-			Link:        h.toLinkDTO(&ov.Links[i].Link),
-			RangeVisits: ov.Links[i].RangeVisits,
-			RangeUnique: ov.Links[i].RangeUnique,
-		}
 	}
 	out.Body.Sources = make([]OverviewSourceDTO, len(ov.Sources))
 	for i, s := range ov.Sources {

@@ -44,6 +44,15 @@ export const LINK_STATUS_OPTIONS = LINK_STATUS_META.map((s) => ({
   label: s.label
 }))
 
+// The status filter's "no filter" value. It sits outside the wire range, so it
+// can never collide with a real status (mirrors engine.StatusAny).
+export const LINK_STATUS_ANY = -1
+
+export const LINK_STATUS_FILTER_OPTIONS = [
+  { value: LINK_STATUS_ANY, label: '全部状态' },
+  ...LINK_STATUS_OPTIONS
+]
+
 // statusMeta resolves a wire status to its display metadata, falling back to
 // "archived" so an unknown value still renders something honest.
 export const statusMeta = (status: number): LinkStatusMeta =>
@@ -76,8 +85,9 @@ export const DASHBOARD_SOURCE = 'dashboard'
 export const sourceLabel = (via: string): string =>
   via === DASHBOARD_SOURCE ? '控制台' : via || '未知来源'
 
-// How the link table can be ordered. Each entry carries its own comparator so
-// the table stays a dumb renderer.
+// How the link table can be ordered. These are wire values, not comparators:
+// ordering happens in SQL over the WHOLE inventory, because sorting the page
+// the reader is holding would only ever rank that page.
 export const LINK_SORT_OPTIONS = [
   { value: 'range', label: '本期访问' },
   { value: 'total', label: '总访问' },
@@ -86,3 +96,15 @@ export const LINK_SORT_OPTIONS = [
 ] as const
 
 export type LinkSortKey = (typeof LINK_SORT_OPTIONS)[number]['value']
+
+// Page sizes the inventory offers. The list is one page at a time on purpose:
+// it grows without bound (siblings mint links over S2S all day), and a table
+// that renders everything silently stops at whatever cap the server picked.
+export const LINK_PAGE_SIZES = [20, 50, 100] as const
+
+export const DEFAULT_LINK_PAGE_SIZE = 20
+
+export const LINK_PAGE_SIZE_OPTIONS = LINK_PAGE_SIZES.map((n) => ({
+  value: n,
+  label: `${n} 条/页`
+}))

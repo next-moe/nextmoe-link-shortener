@@ -147,7 +147,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List short links (newest first) */
+        /**
+         * List short links (one page, filtered and sorted server-side)
+         * @description Returns one page of the link inventory, each row carrying its visit aggregates for the requested window, plus the total the filters match. Search, status and sort all resolve in the database: the inventory grows without bound, so a client that filtered its own page would only ever search the rows it happened to be holding.
+         */
         get: operations["list-links"];
         put?: never;
         /** Create a short link */
@@ -257,7 +260,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Dashboard aggregates (totals, traffic series, per-link and referrer breakdowns) */
+        /** Dashboard aggregates (totals, traffic series, source and referrer breakdowns) */
         get: operations["stats-overview"];
         put?: never;
         post?: never;
@@ -546,7 +549,30 @@ export interface components {
              * @example https://example.com/schemas/LinkListOutputBody.json
              */
             readonly $schema?: string;
-            links: components["schemas"]["LinkDTO"][] | null;
+            links: components["schemas"]["LinkRowDTO"][] | null;
+            /** Format: int64 */
+            page: number;
+            /** Format: int64 */
+            per_page: number;
+            /** Format: int64 */
+            range_days: number;
+            /**
+             * Format: int64
+             * @description rows matching the filters, across every page
+             */
+            total: number;
+            /**
+             * Format: int64
+             * @description at least 1, so an empty inventory still reads as page 1 of 1
+             */
+            total_pages: number;
+        };
+        LinkRowDTO: {
+            link: components["schemas"]["LinkDTO"];
+            /** Format: int64 */
+            range_unique: number;
+            /** Format: int64 */
+            range_visits: number;
         };
         LinkStatsOutputBody: {
             /**
@@ -593,13 +619,6 @@ export interface components {
             readonly $schema?: string;
             ok: boolean;
         };
-        OverviewLinkDTO: {
-            link: components["schemas"]["LinkDTO"];
-            /** Format: int64 */
-            range_unique: number;
-            /** Format: int64 */
-            range_visits: number;
-        };
         OverviewOutputBody: {
             /**
              * Format: uri
@@ -607,7 +626,6 @@ export interface components {
              * @example https://example.com/schemas/OverviewOutputBody.json
              */
             readonly $schema?: string;
-            links: components["schemas"]["OverviewLinkDTO"][] | null;
             /** Format: int64 */
             range_days: number;
             /** Format: date-time */
@@ -1061,7 +1079,19 @@ export interface operations {
     };
     "list-links": {
         parameters: {
-            query?: never;
+            query?: {
+                page?: number;
+                /** @description rows per page (1-100) */
+                per_page?: number;
+                /** @description case-insensitive substring of the alias, destination or description */
+                q?: string;
+                /** @description 0=active 1=disabled 2=archived, -1=any */
+                status?: number;
+                /** @description range=in-window visits, total=all-time visits, created=newest first, alias=A-Z */
+                sort?: "range" | "total" | "created" | "alias";
+                /** @description days the per-row visit aggregates cover */
+                range?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;

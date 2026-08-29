@@ -1,7 +1,10 @@
-// The dashboard's shared state: one time range, one payload, one refresh.
+// The dashboard's aggregates: one payload, one refresh, scoped to the shared
+// time range (useStatsRange).
 //
-// The range is the page's ONLY filter and it scopes everything below it —
-// tiles, chart, breakdowns, table — so the numbers on screen always agree.
+// The range scopes everything below it — tiles, chart, breakdowns, table — so
+// the numbers on screen always agree. Switching it is the container's job, not
+// this composable's: the range now drives two loaders (these aggregates and
+// the paged inventory), and only the page that owns both can reload both.
 // A refetch deliberately keeps `data` in place and only raises `pending`, so
 // the charts hold their previous render instead of flashing a skeleton.
 //
@@ -16,7 +19,7 @@ import type { OverviewDTO } from '~~/shared/types/shortlink'
 export const useOverview = () => {
   const { overview } = useApi()
 
-  const range = useState<number>('overview-range', () => DEFAULT_RANGE_DAYS)
+  const range = useStatsRange()
   const data = useState<OverviewDTO | null>('overview-data', () => null)
   const pending = useState<boolean>('overview-pending', () => false)
   const error = useState<boolean>('overview-error', () => false)
@@ -34,14 +37,6 @@ export const useOverview = () => {
     }
   }
 
-  const setRange = async (days: number) => {
-    if (days === range.value) {
-      return
-    }
-    range.value = days
-    await load()
-  }
-
   // The series is dense and in the viewer's timezone; the granularity follows
   // the window (a 24-hour view reads by hour, longer windows by day).
   const granularity = computed(() => rangeMeta(range.value).granularity)
@@ -52,5 +47,5 @@ export const useOverview = () => {
       : []
   )
 
-  return { range, data, pending, error, load, setRange, granularity, points }
+  return { range, data, pending, error, load, granularity, points }
 }

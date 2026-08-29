@@ -93,10 +93,37 @@ export interface OverviewTotalsDTO {
   active_keys: number
 }
 
-export interface OverviewLinkDTO {
+// One row of the link inventory: the link plus its aggregates for the window
+// the page is scoped to.
+export interface LinkRowDTO {
   link: LinkDTO
   range_visits: number
   range_unique: number
+}
+
+// One page of the inventory. `total` counts every row the filters match, not
+// the rows in `links` — it is what the pager describes and what the header
+// reports, so the console never claims to be showing more than it has.
+export interface LinkPageDTO {
+  links: LinkRowDTO[]
+  total: number
+  page: number
+  per_page: number
+  total_pages: number
+  range_days: number
+}
+
+// The query one page request carries. Every field resolves server-side: the
+// inventory is unbounded, so filtering the page in hand would only ever search
+// the rows the browser happens to be holding.
+export interface LinkQuery {
+  page: number
+  per_page: number
+  q: string
+  // -1 = any status.
+  status: number
+  sort: string
+  range: number
 }
 
 export interface OverviewSourceDTO {
@@ -105,13 +132,15 @@ export interface OverviewSourceDTO {
   range_visits: number
 }
 
+// The console's aggregates. The link inventory is NOT here — it is paged
+// separately (LinkPageDTO), because it is the one part of the page that grows
+// without bound.
 export interface OverviewDTO {
   range_days: number
   range_start: string
   totals: OverviewTotalsDTO
   // Hourly buckets summed across links; sparse (empty hours are omitted).
   series: BucketDTO[]
-  links: OverviewLinkDTO[]
   sources: OverviewSourceDTO[]
   referrers: ReferrerDTO[]
 }

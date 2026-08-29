@@ -5,6 +5,8 @@ import type {
   CreateLinkPayload,
   KeyDTO,
   LinkDTO,
+  LinkPageDTO,
+  LinkQuery,
   LinkStatsDTO,
   OverviewDTO,
   UpdateLinkPayload
@@ -19,13 +21,27 @@ export const useApi = () => {
 
   return {
     // ---- dashboard read model ----
-    // One call answers the whole console: totals, the traffic series, and the
-    // per-link / source / referrer breakdowns.
+    // One call answers the console's aggregates: totals, the traffic series,
+    // and the source / referrer breakdowns. The link inventory is NOT in here —
+    // it pages separately, because it is the one part of the page that grows
+    // without bound.
     overview: (range: number) =>
       apiFetch<OverviewDTO>(`/stats/overview?range=${range}`),
 
     // ---- links ----
-    listLinks: () => apiFetch<{ links: LinkDTO[] }>('/links'),
+    // One page of the inventory. Every field of the query resolves in the
+    // database, so search and sort reach rows this page is not holding.
+    listLinks: (query: LinkQuery) =>
+      apiFetch<LinkPageDTO>(
+        `/links?${new URLSearchParams({
+          page: String(query.page),
+          per_page: String(query.per_page),
+          q: query.q,
+          status: String(query.status),
+          sort: query.sort,
+          range: String(query.range)
+        })}`
+      ),
     createLink: (payload: CreateLinkPayload) =>
       apiFetch<LinkDTO>('/links', { method: 'POST', body: payload }),
     linkStats: (alias: string, range = 7) =>
