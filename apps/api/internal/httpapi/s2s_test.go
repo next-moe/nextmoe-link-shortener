@@ -31,6 +31,10 @@ type testStack struct {
 // SHORTLINK_DB_DSN, applies the schema, and empties it. The DSN is never
 // discovered from a .env: an unset variable skips instead of touching whatever
 // database happens to be configured for development.
+//
+// Both test packages share that one database and empty it on entry, so the
+// suite runs with `go test -p 1` (see package.json): package-level parallelism
+// would have them truncate each other's fixtures mid-run.
 func newTestStack(t *testing.T) testStack {
 	t.Helper()
 	dsn := os.Getenv("SHORTLINK_DB_DSN")

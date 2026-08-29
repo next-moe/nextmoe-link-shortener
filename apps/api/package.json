@@ -4,7 +4,7 @@
   "scripts": {
     "dev": "go build -o ./build/server ./cmd/server && exec ./build/server",
     "build": "go build -o ./build/server ./cmd/server",
-    "test": "go test ./...",
+    "test": "go test -p 1 ./...",
     "lint": "go vet ./...",
     "gen": "go run ./cmd/spec > openapi/openapi.yaml"
   }
