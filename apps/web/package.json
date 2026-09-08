@@ -12,10 +12,10 @@
     "gen": "openapi-typescript ../api/openapi/openapi.yaml -o shared/types/api.d.ts"
   },
   "dependencies": {
-    "@kungal/ui-core": "2.14.0",
-    "@kungal/ui-nuxt": "2.14.0",
-    "@kungal/ui-tokens": "2.14.0",
-    "@kungal/ui-vue": "2.14.0",
+    "@kungal/ui-core": "2.32.0",
+    "@kungal/ui-nuxt": "2.32.0",
+    "@kungal/ui-tokens": "2.32.0",
+    "@kungal/ui-vue": "2.32.0",
     "@tailwindcss/vite": "^4.3.2",
     "nuxt": "^4.5.2",
     "tailwindcss": "^4.3.2",
