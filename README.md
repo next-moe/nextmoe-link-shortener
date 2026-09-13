@@ -148,7 +148,7 @@ Cloudflare 在前面时，SSL/TLS 模式要用 **Full (strict)**；Flexible 会�
 |---|---|---|
 | `SHORTLINK_DB_DSN` | ✅ | `postgres://shortlink:<密码>@postgres:5432/kun_shortlink?sslmode=disable` |
 | `SHORTLINK_PUBLIC_BASE_URL` | ✅ | 站点对外 origin（短链 `<base>/s/<alias>` 由它拼） |
-| `SHORTLINK_OIDC_ISSUER` | ✅ | `https://oauth.kungal.com`（端点走 discovery，不要硬编码） |
+| `SHORTLINK_OIDC_ISSUER` | ✅ | `https://account.nextmoe.com`（端点走 discovery，不要硬编码；这个值必须与 OP 自报的 `issuer` **逐字相同**——边缘 308 能转发请求，但改不了 token 里盖好的 `iss`，2026-09-13 改域时旧值就是这样把登录全判死的） |
 | `SHORTLINK_OIDC_CLIENT_ID` | ✅ | 上面注册的 client id |
 | `SHORTLINK_OIDC_CLIENT_SECRET` | ✅ | 对应的**明文** secret |
 | `SHORTLINK_OIDC_REDIRECT_URI` | ✅ | `https://<域名>/auth/callback`，必须与 IdP 侧登记的完全一致 |
