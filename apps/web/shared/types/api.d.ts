@@ -244,7 +244,7 @@ export interface paths {
         put?: never;
         /**
          * Batch daily visit stats for a set of aliases
-         * @description Per-alias daily totals and deduplicated visitor counts over an inclusive JST date range (at most 92 days, at most 500 aliases). Days without traffic are omitted; an alias that does not exist yields an empty array rather than failing the batch.
+         * @description Per-alias daily totals, deduplicated human visitor counts and declared-bot hits over an inclusive JST date range (at most 92 days, at most 500 aliases). Days without traffic are omitted; an alias that does not exist yields an empty array rather than failing the batch.
          */
         post: operations["s2s-daily-stats"];
         delete?: never;
@@ -368,16 +368,21 @@ export interface components {
             user_id: number;
         };
         DailyStatDTO: {
+            /**
+             * Format: int64
+             * @description Hits that day from user agents announcing an automated client (crawlers, link previews, HTTP libraries); counted in total, never in uniques
+             */
+            bots: number;
             /** @description JST calendar day (YYYY-MM-DD) */
             date: string;
             /**
              * Format: int64
-             * @description All hits recorded that day
+             * @description All hits recorded that day, bots included
              */
             total: number;
             /**
              * Format: int64
-             * @description Distinct visitor fingerprints that day
+             * @description Distinct visitor fingerprints that day, declared bots excluded
              */
             uniques: number;
         };

@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"errors"
 	"os"
 	"testing"
 	"time"
@@ -177,5 +178,111 @@ func TestDailyStatsCoversRequestedAliasesAndRange(t *testing.T) {
 	}
 	if got := stats["nosuchalias"]; got == nil || len(got) != 0 {
 		t.Fatalf("an unknown alias must map to an empty array, got %+v", got)
+	}
+}
+
+const crawlerUA = "Mozilla/5.0 (compatible; SemrushBot/7~bl; +http://www.semrush.com/bot.html)"
+
+func TestRecordVisitKeepsBotsOutOfUniques(t *testing.T) {
+	e := testEngine(t)
+	link := mustLink(t, e, "bots01")
+	atClock(t, time.Date(2026, 8, 25, 3, 0, 0, 0, time.UTC))
+
+	crawler := VisitMeta{IP: "203.0.113.50", UserAgent: crawlerUA}
+	mustResolve(t, e, link.Alias, crawler)
+	mustResolve(t, e, link.Alias, crawler)
+	mustResolve(t, e, link.Alias, VisitMeta{IP: "203.0.113.7", UserAgent: "agent-a"})
+
+	row := dayRow(t, e, link.ID, "2026-08-25")
+	if row.Total != 3 || row.Uniques != 1 || row.Bots != 2 {
+		t.Fatalf("want total=3 uniques=1 bots=2, got total=%d uniques=%d bots=%d", row.Total, row.Uniques, row.Bots)
+	}
+	var claims int64
+	if err := e.db.Model(&model.ShortLinkVisitorDay{}).
+		Where("short_link_id = ?", link.ID).Count(&claims).Error; err != nil {
+		t.Fatalf("count visitor days: %v", err)
+	}
+	if claims != 1 {
+		t.Fatalf("a bot must not claim a visitor-day: want 1 claim, got %d", claims)
+	}
+
+	day, _ := ParseDate("2026-08-25")
+	stats, err := e.DailyStats([]string{link.Alias}, day, day)
+	if err != nil {
+		t.Fatalf("daily stats: %v", err)
+	}
+	if got := stats[link.Alias]; len(got) != 1 || got[0].Bots != 2 || got[0].Uniques != 1 {
+		t.Fatalf("unexpected daily stats: %+v", got)
+	}
+}
+
+func TestRecountSettlementRebuildsFromTheRawVisits(t *testing.T) {
+	e := testEngine(t)
+	link := mustLink(t, e, "recount01")
+	for _, at := range []time.Time{
+		time.Date(2026, 8, 25, 3, 0, 0, 0, time.UTC),
+		time.Date(2026, 8, 26, 3, 0, 0, 0, time.UTC),
+	} {
+		atClock(t, at)
+		mustResolve(t, e, link.Alias, VisitMeta{IP: "203.0.113.7", UserAgent: "agent-a"})
+		mustResolve(t, e, link.Alias, VisitMeta{IP: "203.0.113.8", UserAgent: "agent-b"})
+		mustResolve(t, e, link.Alias, VisitMeta{IP: "203.0.113.50", UserAgent: crawlerUA})
+	}
+	// Put the tables back in the shape they had before the bot rule: the
+	// crawler holding a visitor-day and counted among the uniques.
+	for _, stmt := range []string{
+		`UPDATE short_link_visit SET is_bot = false`,
+		`UPDATE short_link_visit_days SET uniques = uniques + bots, bots = 0`,
+		`INSERT INTO short_link_visitor_days (short_link_id, day, fp_hash, created_at)
+		 SELECT short_link_id, ` + jstDaySQL + `, fp_hash, created_at FROM short_link_visit
+		  WHERE user_agent = '` + crawlerUA + `'`,
+	} {
+		if err := e.db.Exec(stmt).Error; err != nil {
+			t.Fatalf("seed legacy state: %v", err)
+		}
+	}
+
+	atClock(t, time.Date(2026, 8, 28, 3, 0, 0, 0, time.UTC))
+	for run := 1; run <= 2; run++ {
+		res, err := e.RecountSettlement(time.Time{}, Yesterday())
+		if err != nil {
+			t.Fatalf("run %d: recount: %v", run, err)
+		}
+		if res.From != "2026-08-25" || res.To != "2026-08-27" || res.Visits != 6 || res.BotVisits != 2 || res.LinkDays != 2 {
+			t.Fatalf("run %d: unexpected result %+v", run, res)
+		}
+		for _, day := range []string{"2026-08-25", "2026-08-26"} {
+			row := dayRow(t, e, link.ID, day)
+			if row.Total != 3 || row.Uniques != 2 || row.Bots != 1 {
+				t.Fatalf("run %d, %s: want total=3 uniques=2 bots=1, got total=%d uniques=%d bots=%d",
+					run, day, row.Total, row.Uniques, row.Bots)
+			}
+		}
+		var claims int64
+		if err := e.db.Model(&model.ShortLinkVisitorDay{}).
+			Where("short_link_id = ?", link.ID).Count(&claims).Error; err != nil {
+			t.Fatalf("count visitor days: %v", err)
+		}
+		if claims != 4 {
+			t.Fatalf("run %d: want 4 human visitor-days, got %d", run, claims)
+		}
+	}
+}
+
+func TestRecountSettlementRefusesTodayAndDaysBeforeCounting(t *testing.T) {
+	e := testEngine(t)
+	link := mustLink(t, e, "recount02")
+	atClock(t, time.Date(2026, 8, 25, 3, 0, 0, 0, time.UTC))
+	mustResolve(t, e, link.Alias, VisitMeta{IP: "203.0.113.7", UserAgent: "agent-a"})
+
+	today, _ := ParseDate("2026-08-25")
+	if _, err := e.RecountSettlement(time.Time{}, today); !errors.Is(err, ErrRecountRange) {
+		t.Fatalf("today is still being written: want ErrRecountRange, got %v", err)
+	}
+
+	atClock(t, time.Date(2026, 8, 27, 3, 0, 0, 0, time.UTC))
+	before, _ := ParseDate("2026-08-24")
+	if _, err := e.RecountSettlement(before, Yesterday()); !errors.Is(err, ErrRecountRange) {
+		t.Fatalf("a day before the first settlement day: want ErrRecountRange, got %v", err)
 	}
 }

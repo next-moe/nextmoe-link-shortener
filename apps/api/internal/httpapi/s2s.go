@@ -42,7 +42,7 @@ func (h *handlers) registerS2S(api huma.API) {
 		Method:      http.MethodPost,
 		Path:        "/s2s/stats/daily",
 		Summary:     "Batch daily visit stats for a set of aliases",
-		Description: "Per-alias daily totals and deduplicated visitor counts over an inclusive JST date range (at most 92 days, at most 500 aliases). Days without traffic are omitted; an alias that does not exist yields an empty array rather than failing the batch.",
+		Description: "Per-alias daily totals, deduplicated human visitor counts and declared-bot hits over an inclusive JST date range (at most 92 days, at most 500 aliases). Days without traffic are omitted; an alias that does not exist yields an empty array rather than failing the batch.",
 		Tags:        []string{"s2s"},
 		Security:    []map[string][]string{{"apiKey": {}}},
 	}, h.s2sDailyStats)
@@ -149,8 +149,9 @@ type DailyStatsBody struct {
 // DailyStatDTO is one JST day of counters for one alias.
 type DailyStatDTO struct {
 	Date    string `json:"date" doc:"JST calendar day (YYYY-MM-DD)"`
-	Total   int64  `json:"total" doc:"All hits recorded that day"`
-	Uniques int64  `json:"uniques" doc:"Distinct visitor fingerprints that day"`
+	Total   int64  `json:"total" doc:"All hits recorded that day, bots included"`
+	Uniques int64  `json:"uniques" doc:"Distinct visitor fingerprints that day, declared bots excluded"`
+	Bots    int64  `json:"bots" doc:"Hits that day from user agents announcing an automated client (crawlers, link previews, HTTP libraries); counted in total, never in uniques"`
 }
 
 // DailyStatsResult maps each requested alias to its days with traffic.
@@ -202,7 +203,7 @@ func (h *handlers) s2sDailyStats(_ context.Context, in *s2sDailyStatsInput) (*s2
 	for alias, days := range stats {
 		dtos := make([]DailyStatDTO, len(days))
 		for i, d := range days {
-			dtos[i] = DailyStatDTO{Date: d.Date, Total: d.Total, Uniques: d.Uniques}
+			dtos[i] = DailyStatDTO{Date: d.Date, Total: d.Total, Uniques: d.Uniques, Bots: d.Bots}
 		}
 		out.Body.Stats[alias] = dtos
 	}

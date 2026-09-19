@@ -90,7 +90,7 @@ func (s testStack) postStats(t *testing.T, key string, body map[string]any) (int
 
 // seedLink creates a link and writes its day counters straight to the
 // aggregate, so the HTTP tests do not depend on the redirect clock.
-func (s testStack) seedLink(t *testing.T, alias string, days map[string][2]int64) {
+func (s testStack) seedLink(t *testing.T, alias string, days map[string][3]int64) {
 	t.Helper()
 	link, _, err := s.eng.CreateLink(engine.CreateLinkParams{
 		DestinationURL: "https://www.dlsite.com/maniax/work/=/product_id/RJ01234567.html",
@@ -106,7 +106,7 @@ func (s testStack) seedLink(t *testing.T, alias string, days map[string][2]int64
 			t.Fatalf("parse day: %v", err)
 		}
 		if err := s.gdb.Create(&model.ShortLinkVisitDay{
-			ShortLinkID: link.ID, Day: parsed, Total: counts[0], Uniques: counts[1],
+			ShortLinkID: link.ID, Day: parsed, Total: counts[0], Uniques: counts[1], Bots: counts[2],
 		}).Error; err != nil {
 			t.Fatalf("seed day: %v", err)
 		}
@@ -115,8 +115,8 @@ func (s testStack) seedLink(t *testing.T, alias string, days map[string][2]int64
 
 func TestDailyStatsReturnsCountersPerAlias(t *testing.T) {
 	s := newTestStack(t)
-	s.seedLink(t, "statsone", map[string][2]int64{"2026-08-25": {7, 3}, "2026-08-27": {2, 2}})
-	s.seedLink(t, "statstwo", map[string][2]int64{"2026-08-26": {5, 4}})
+	s.seedLink(t, "statsone", map[string][3]int64{"2026-08-25": {7, 3, 4}, "2026-08-27": {2, 2, 0}})
+	s.seedLink(t, "statstwo", map[string][3]int64{"2026-08-26": {5, 4}})
 
 	status, out := s.postStats(t, s.key, map[string]any{
 		"aliases": []string{"statsone", "statstwo"},
@@ -127,7 +127,7 @@ func TestDailyStatsReturnsCountersPerAlias(t *testing.T) {
 		t.Fatalf("want 200, got %d", status)
 	}
 	one := out.Stats["statsone"]
-	if len(one) != 1 || one[0].Date != "2026-08-25" || one[0].Total != 7 || one[0].Uniques != 3 {
+	if len(one) != 1 || one[0].Date != "2026-08-25" || one[0].Total != 7 || one[0].Uniques != 3 || one[0].Bots != 4 {
 		t.Fatalf("unexpected statsone days: %+v", one)
 	}
 	two := out.Stats["statstwo"]
@@ -138,7 +138,7 @@ func TestDailyStatsReturnsCountersPerAlias(t *testing.T) {
 
 func TestDailyStatsMapsAnUnknownAliasToAnEmptyArray(t *testing.T) {
 	s := newTestStack(t)
-	s.seedLink(t, "statsone", map[string][2]int64{"2026-08-25": {7, 3}})
+	s.seedLink(t, "statsone", map[string][3]int64{"2026-08-25": {7, 3}})
 
 	status, out := s.postStats(t, s.key, map[string]any{
 		"aliases": []string{"statsone", "nosuchalias"},

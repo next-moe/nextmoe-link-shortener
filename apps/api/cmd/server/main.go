@@ -31,6 +31,10 @@ func main() {
 	}
 	initLogger(cfg.Mode)
 
+	if len(os.Args) > 1 && os.Args[1] == "recount-bots" {
+		os.Exit(recountBots(cfg, os.Args[2:]))
+	}
+
 	// Connect Postgres up front and fail loud — no degraded, database-less
 	// mode. AutoMigrate runs inside Open.
 	database, err := db.Open(cfg.DBDSN)
