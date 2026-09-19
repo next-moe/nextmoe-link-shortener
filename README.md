@@ -64,11 +64,13 @@ Authorization: Bearer slk_...
 POST /s2s/stats/daily
 Authorization: Bearer slk_...
 { "aliases": ["aB3kZ9"], "from": "2026-09-01", "to": "2026-09-30" }
-→ { "stats": { "aB3kZ9": [ { "date": "2026-09-01", "total": 12, "uniques": 9 } ] } }
+→ { "stats": { "aB3kZ9": [ { "date": "2026-09-01", "total": 12, "uniques": 7, "bots": 3 } ] } }
 ```
 
 - `from` / `to` 是 **JST（Asia/Tokyo）日历日**，闭区间，跨度 ≤ 92 天；无流量的日不出现
 - 去重口径：一个访问指纹 `sha256(ip + "\n" + user_agent)` 在同一短链的同一 JST 日只计一次 unique
+- 爬虫口径：User-Agent 自报自动化客户端的访问（爬虫、链接预览、HTTP 库，规则在 `engine/bots.go`）照常跳转、计入 `total` 与 `bots`，**不计入 `uniques`**；站点 `robots.txt` 整站 `Disallow: /`
+- 改了爬虫规则后用 `docker exec <api 容器> /app recount-bots [-from YYYY-MM-DD] [-to YYYY-MM-DD]` 按原始访问记录重算结算表（默认从第一个结算日到 JST 昨天；当天仍在写入，不许重算）
 - `aliases` 一批 1-500 个；越界或超限 → 422
 - 未知 alias 返回空数组而不是 404 —— 单个未知不得让整批失败
 

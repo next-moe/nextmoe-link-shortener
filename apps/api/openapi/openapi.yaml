@@ -166,21 +166,26 @@ components:
     DailyStatDTO:
       additionalProperties: false
       properties:
+        bots:
+          description: Hits that day from user agents announcing an automated client (crawlers, link previews, HTTP libraries); counted in total, never in uniques
+          format: int64
+          type: integer
         date:
           description: JST calendar day (YYYY-MM-DD)
           type: string
         total:
-          description: All hits recorded that day
+          description: All hits recorded that day, bots included
           format: int64
           type: integer
         uniques:
-          description: Distinct visitor fingerprints that day
+          description: Distinct visitor fingerprints that day, declared bots excluded
           format: int64
           type: integer
       required:
         - date
         - total
         - uniques
+        - bots
       type: object
     DailyStatsBody:
       additionalProperties: false
@@ -1393,7 +1398,7 @@ paths:
         - s2s
   /s2s/stats/daily:
     post:
-      description: Per-alias daily totals and deduplicated visitor counts over an inclusive JST date range (at most 92 days, at most 500 aliases). Days without traffic are omitted; an alias that does not exist yields an empty array rather than failing the batch.
+      description: Per-alias daily totals, deduplicated human visitor counts and declared-bot hits over an inclusive JST date range (at most 92 days, at most 500 aliases). Days without traffic are omitted; an alias that does not exist yields an empty array rather than failing the batch.
       operationId: s2s-daily-stats
       parameters:
         - description: Bearer slk_...

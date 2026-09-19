@@ -49,7 +49,11 @@ type ShortLinkVisit struct {
 	// FpHash is hex(sha256(ip + "\n" + user_agent)).
 	FpHash string `gorm:"size:64;not null;default:''"`
 	// IsUnique marks the first visit from this IP within the bucket window.
-	IsUnique  bool      `gorm:"not null;default:false"`
+	IsUnique bool `gorm:"not null;default:false"`
+	// IsBot marks a user agent that announces an automated client. Such a
+	// visit still redirects and still counts in the totals, but never claims a
+	// settlement visitor-day.
+	IsBot     bool      `gorm:"not null;default:false"`
 	CreatedAt time.Time `gorm:"index:idx_visit_link_created"`
 
 	ShortLink ShortLink `gorm:"constraint:OnDelete:CASCADE"`
@@ -74,12 +78,13 @@ type ShortLinkVisitorDay struct {
 func (ShortLinkVisitorDay) TableName() string { return "short_link_visitor_days" }
 
 // ShortLinkVisitDay is the per-JST-day aggregate the settlement surface reads:
-// total hits and deduplicated visitors.
+// total hits, deduplicated human visitors, and the hits from declared bots.
 type ShortLinkVisitDay struct {
 	ShortLinkID int64     `gorm:"primaryKey"`
 	Day         time.Time `gorm:"type:date;primaryKey"`
 	Total       int64     `gorm:"not null;default:0"`
 	Uniques     int64     `gorm:"not null;default:0"`
+	Bots        int64     `gorm:"not null;default:0"`
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 

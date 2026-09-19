@@ -97,13 +97,15 @@ func (e *Engine) ResolveRedirect(alias, rawQuery string, meta VisitMeta) (string
 // recordVisit writes the visit facts in one transaction: the counter bump on
 // the link, the visit row, the hourly bucket upsert, and the JST-day
 // settlement pair (visitor-day claim + daily aggregate). is_unique marks the
-// first hit from this IP within the current hourly window.
+// first hit from this IP within the current hourly window. A declared bot's
+// hit counts in the totals and in the day's bots, never in its uniques.
 func (e *Engine) recordVisit(link *model.ShortLink, meta VisitMeta) error {
 	now := timeNow()
 	bucket := bucketStart(now)
 	day := settlementDay(now)
 	fpHash := fingerprint(meta.IP, meta.UserAgent)
 	ip := truncate(meta.IP, 45)
+	bot := IsBot(meta.UserAgent)
 
 	unique := false
 	if ip != "" {
@@ -131,6 +133,8 @@ func (e *Engine) recordVisit(link *model.ShortLink, meta VisitMeta) error {
 			Referer:     truncate(meta.Referer, 500),
 			FpHash:      fpHash,
 			IsUnique:    unique,
+			IsBot:       bot,
+			CreatedAt:   now,
 		}).Error; err != nil {
 			return err
 		}
@@ -154,23 +158,28 @@ func (e *Engine) recordVisit(link *model.ShortLink, meta VisitMeta) error {
 			return err
 		}
 
-		claim := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&model.ShortLinkVisitorDay{
-			ShortLinkID: link.ID,
-			Day:         day,
-			FpHash:      fpHash,
-		})
-		if claim.Error != nil {
-			return claim.Error
-		}
-		dayUniqueInc := int64(0)
-		if claim.RowsAffected > 0 {
-			dayUniqueInc = 1
+		dayUniqueInc, dayBotInc := int64(0), int64(0)
+		if bot {
+			dayBotInc = 1
+		} else {
+			claim := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&model.ShortLinkVisitorDay{
+				ShortLinkID: link.ID,
+				Day:         day,
+				FpHash:      fpHash,
+			})
+			if claim.Error != nil {
+				return claim.Error
+			}
+			if claim.RowsAffected > 0 {
+				dayUniqueInc = 1
+			}
 		}
 		return tx.Clauses(clause.OnConflict{
 			Columns: []clause.Column{{Name: "short_link_id"}, {Name: "day"}},
 			DoUpdates: clause.Assignments(map[string]any{
 				"total":      gorm.Expr("short_link_visit_days.total + 1"),
 				"uniques":    gorm.Expr("short_link_visit_days.uniques + ?", dayUniqueInc),
+				"bots":       gorm.Expr("short_link_visit_days.bots + ?", dayBotInc),
 				"updated_at": now,
 			}),
 		}).Create(&model.ShortLinkVisitDay{
@@ -178,6 +187,7 @@ func (e *Engine) recordVisit(link *model.ShortLink, meta VisitMeta) error {
 			Day:         day,
 			Total:       1,
 			Uniques:     dayUniqueInc,
+			Bots:        dayBotInc,
 		}).Error
 	})
 }
@@ -198,6 +208,7 @@ type DailyStat struct {
 	Date    string
 	Total   int64
 	Uniques int64
+	Bots    int64
 }
 
 // DailyStats returns the JST-day counters of each alias over the inclusive
@@ -223,9 +234,10 @@ func (e *Engine) DailyStats(aliases []string, from, to time.Time) (map[string][]
 		Day     time.Time
 		Total   int64
 		Uniques int64
+		Bots    int64
 	}
 	err := e.db.Table("short_link_visit_days AS d").
-		Select("l.alias AS alias, d.day AS day, d.total AS total, d.uniques AS uniques").
+		Select("l.alias AS alias, d.day AS day, d.total AS total, d.uniques AS uniques, d.bots AS bots").
 		Joins("JOIN short_link AS l ON l.id = d.short_link_id").
 		Where("l.alias IN ? AND d.day >= ? AND d.day <= ?", wanted, from, to).
 		Order("d.day").
@@ -238,6 +250,7 @@ func (e *Engine) DailyStats(aliases []string, from, to time.Time) (map[string][]
 			Date:    r.Day.Format(DateLayout),
 			Total:   r.Total,
 			Uniques: r.Uniques,
+			Bots:    r.Bots,
 		})
 	}
 	return out, nil
