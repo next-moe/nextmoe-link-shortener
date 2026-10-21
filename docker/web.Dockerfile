@@ -11,7 +11,7 @@
 # project-unique network alias in docker-compose.prod.yml — NOT the bare
 # service name: this container also joins the shared dokploy-network, where a
 # sibling project's `api` service would be an equally valid DNS answer.
-ARG NODE_VERSION=24
+ARG NODE_VERSION=24.22.1
 
 FROM node:${NODE_VERSION}-trixie-slim AS base
 RUN corepack enable
