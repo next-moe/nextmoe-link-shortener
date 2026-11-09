@@ -100,9 +100,17 @@ export type LinkSortKey = (typeof LINK_SORT_OPTIONS)[number]['value']
 // Page sizes the inventory offers. The list is one page at a time on purpose:
 // it grows without bound (siblings mint links over S2S all day), and a table
 // that renders everything silently stops at whatever cap the server picked.
-export const LINK_PAGE_SIZES = [20, 50, 100] as const
-
+//
+// Keep LINK_PAGE_SIZES multiline. Nuxt's auto-import scanner (mlly) treats the
+// next `export const` as a continuation of a one-line `[20, 50, 100]`, drops
+// that name, and the production bundle throws "X is not defined".
 export const DEFAULT_LINK_PAGE_SIZE = 20
+
+export const LINK_PAGE_SIZES = [
+  DEFAULT_LINK_PAGE_SIZE,
+  50,
+  100
+] as const
 
 export const LINK_PAGE_SIZE_OPTIONS = LINK_PAGE_SIZES.map((n) => ({
   value: n,
